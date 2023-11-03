@@ -15,5 +15,6 @@
     <ErrorReportUrlHistory />
     <FallbackCulture>en-US</FallbackCulture>
     <VerifyUploadedFiles>false</VerifyUploadedFiles>
+    <_LastSelectedProfileId>D:\Development\apps\MailQueueNet\MailQueueNet.Service\Properties\PublishProfiles\Windows.pubxml</_LastSelectedProfileId>
   </PropertyGroup>
 </Project>
