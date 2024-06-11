@@ -8,7 +8,7 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>MailQueueNet.Service</RootNamespace>
     <AssemblyName>MailQueueNet.Service</AssemblyName>
-    <TargetFramework>net7.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <FileAlignment>512</FileAlignment>
     <MapFileExtensions>true</MapFileExtensions>
     <ApplicationRevision>0</ApplicationRevision>
@@ -18,7 +18,7 @@
     <Version>3.0.7</Version>
     <PublishSingleFile>false</PublishSingleFile>
     <!-- https://docs.microsoft.com/en-us/dotnet/core/rid-catalog -->
-    <RuntimeIdentifiers>win-x64;win10-x64;linux-x64;ubuntu.20.04-x64;osx.11.0-x64</RuntimeIdentifiers>
+    <RuntimeIdentifiers>win-x64;linux-x64;</RuntimeIdentifiers>
     <UseAppHost>true</UseAppHost>
     <PlatformTarget>AnyCPU</PlatformTarget>
     <RollForward>LatestMinor</RollForward>
@@ -63,12 +63,12 @@
     <AllowedReferenceRelatedFileExtensions>.pdb;.dll.config</AllowedReferenceRelatedFileExtensions>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Grpc.AspNetCore.Server" Version="2.58.0" />
-    <PackageReference Include="Microsoft.AspNetCore.Hosting" Version="2.2.7" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="7.0.1" />
-    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="7.0.0" />
+    <PackageReference Include="Grpc.AspNetCore.Server" Version="2.63.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Hosting" Version="2.1.1" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Systemd" Version="5.0.0" Condition="'$(IsLinux)'=='true' Or '$(IsPortable)'=='true'" />
-    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="7.0.1" Condition="'$(IsWindows)'=='true' Or '$(IsPortable)'=='true'" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="8.0.0" Condition="'$(IsWindows)'=='true' Or '$(IsPortable)'=='true'" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
   <ItemGroup>
