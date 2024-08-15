@@ -7,7 +7,9 @@ using System.Collections.Concurrent;
 using System.Linq;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
+using MailQueueNet.Core.Logging;
 using MailQueueNet.Service.Utilities;
+using System.Net.Mail;
 
 namespace MailQueueNet.Service.Core
 {
@@ -164,6 +166,7 @@ namespace MailQueueNet.Service.Core
             }
 
             _Logger?.LogInformation("Done.");
+            MailQueueNetLogger.SaveLogFiles(true);
         }
 
         #endregion
@@ -190,6 +193,7 @@ namespace MailQueueNet.Service.Core
             try
             {
                 _Logger?.LogTrace("Reading mail from " + fileName);
+                MailQueueNetLogger.LogMessage("Sending email " + fileName, LogFileTypes.DebugLog);
 
                 try
                 {
@@ -200,29 +204,31 @@ namespace MailQueueNet.Service.Core
                 catch (FileNotFoundException)
                 {
                     _Logger?.LogWarning($"Failed reading {fileName}, file not found.");
-                    
+                    MailQueueNetLogger.LogException("Failed Reading email " + fileName);
+
                     message?.Dispose();
                     MarkFailed(fileName, message);
                     return;
                 }
-                
+
                 Interlocked.Increment(ref _concurrentWorkers);
                 workerInUse = true;
-
-                var logDesc = $"To={message.To}, CC={message.CC}, Bcc={message.Bcc}";
+                string logDesc = GetLongDesc(message);
 
                 _Logger?.LogDebug($"Sending {fileName} task to worker ({logDesc})");
+                MailQueueNetLogger.LogMessage($"Sending {fileName} task email  task to worker ({logDesc})", LogFileTypes.EmailLog, IBC.Logging.LogLevel.None);
 
                 if (mailSettings == null || mailSettings.IsEmpty())
                 {
                     mailSettings = _MailSettings;
                 }
-                
+
                 var success = await SenderFactory.SendMailAsync(message, mailSettings);
 
                 if (!success)
                 {
                     _Logger?.LogWarning($"No mail server name, skipping {fileName} ({logDesc})");
+                    MailQueueNetLogger.LogMessage($"No mail server name, skipping {fileName} ({logDesc})", LogFileTypes.DebugLog);
 
                     message?.Dispose();
                     MarkSkipped(fileName);
@@ -230,10 +236,11 @@ namespace MailQueueNet.Service.Core
                 else
                 {
                     _Logger?.LogInformation($"Sent mail for {fileName} ({logDesc})");
+                    MailQueueNetLogger.LogMessage($"Sent mail for {fileName} ({logDesc})", LogFileTypes.EmailLog, IBC.Logging.LogLevel.None);
 
                     MarkSent(fileName, message);
                 }
-                
+
                 _Logger?.LogTrace($"Releasing worker from {fileName} task ({logDesc})");
 
                 // Task ended, decrement counter and pulse to the Coordinator thread
@@ -250,6 +257,7 @@ namespace MailQueueNet.Service.Core
                 _Logger?.LogError(ex, $"Exception thrown for {fileName}");
 
                 _Logger?.LogWarning($"Task failed for {fileName}");
+                MailQueueNetLogger.LogException($"Exception thrown for {fileName} ex: {ex}");
 
                 if (workerInUse)
                 {
@@ -265,6 +273,16 @@ namespace MailQueueNet.Service.Core
                     Monitor.Pulse(_actionMonitor);
                 }
             }
+        }
+
+        public static string GetLongDesc(Grpc.MailMessage message)
+        {
+            return $"To={message.To}, CC={message.Cc}, Bcc={message.Bcc}, From={message.From}";
+        }
+
+        public static string GetLongDesc(MailMessage message)
+        {
+            return $"To={message.To}, CC={message.CC}, Bcc={message.Bcc}, From={message.From}";
         }
 
         private void MarkFailed(string fileName, System.Net.Mail.MailMessage message)
@@ -312,9 +330,12 @@ namespace MailQueueNet.Service.Core
                     {
                         file = Path.Combine(failedPath, DateTime.Now.ToString(@"yyyyMMddHHmmss") + "_" + Guid.NewGuid().ToString(@"N") + @".mail");
                         File.Move(fileName, file);
+
+                        MailQueueNetLogger.LogMessage($"File Moved {fileName} -> {file}", LogFileTypes.DebugLog);
                     }
                     catch
                     {
+                        MailQueueNetLogger.LogException($"File Moved Failed {fileName}");
                         // No choice left, lose it, to get it out of the system
                         try { File.Delete(fileName); }
                         catch { }
@@ -333,8 +354,12 @@ namespace MailQueueNet.Service.Core
                         try
                         {
                             File.Delete(fn);
+                            MailQueueNetLogger.LogMessage($"MarkFailed - File Delete: {fn}", LogFileTypes.DebugLog);
                         }
-                        catch { }
+                        catch
+                        {
+                            MailQueueNetLogger.LogException($"MarkFailed - File Delete Failed {fn}");
+                        }
                     }
                 }
             }
@@ -363,8 +388,12 @@ namespace MailQueueNet.Service.Core
                     try
                     {
                         File.Delete(fn);
+                        MailQueueNetLogger.LogMessage($"MarkSent - File Delete: {fn}", LogFileTypes.DebugLog);
                     }
-                    catch { }
+                    catch
+                    {
+                        MailQueueNetLogger.LogException($"MarkSent - File Delete Failed {fn}");
+                    }
                 }
             }
         }
@@ -419,27 +448,14 @@ namespace MailQueueNet.Service.Core
                     {
                         _sendingFileNames[destPath] = true;
                         File.Move(tempPath, destPath, false);
+                        MailQueueNetLogger.LogMessage($"Moved to Queue: {destPath}", LogFileTypes.DebugLog);
                         success = true;
                         break;
                     }
-                    catch (DirectoryNotFoundException ex)
+                    catch (Exception ex)
                     {
                         _Logger?.LogError(ex, $"Exception thrown for AddMail");
-                        break;
-                    }
-                    catch (PathTooLongException ex)
-                    {
-                        _Logger?.LogError(ex, $"Exception thrown for AddMail");
-                        break;
-                    }
-                    catch (FileNotFoundException ex)
-                    {
-                        _Logger?.LogError(ex, $"Exception thrown for AddMail");
-                        break;
-                    }
-                    catch (IOException ex)
-                    {
-                        _Logger?.LogError(ex, $"Exception thrown for AddMail");
+                        MailQueueNetLogger.LogException($"Error moving to queue: {destPath} ex: {ex}");
                         break;
                     }
                     finally
@@ -491,6 +507,8 @@ namespace MailQueueNet.Service.Core
             }
             catch
             {
+                string logDesc = GetLongDesc(message.Message);
+                MailQueueNetLogger.LogException($"WriteMailToFile failed: {logDesc}");
                 return false;
             }
         }

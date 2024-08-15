@@ -10,7 +10,7 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>MailQueueNet.Core</RootNamespace>
     <AssemblyName>MailQueueNet.Core</AssemblyName>
-    <TargetFramework>netstandard2.1</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <FileAlignment>512</FileAlignment>
     <MapFileExtensions>true</MapFileExtensions>
     <ApplicationRevision>0</ApplicationRevision>
@@ -44,6 +44,9 @@
     <StartupObject />
     <Copyright>Copyright © Daniel Cohen Gindi (danielgindi@gmail.com) 2014</Copyright>
   </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="IBC.Logging" Version="3.0.11" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\MailQueueNet.Common\MailQueueNet.Common.csproj" />
   </ItemGroup>

@@ -1,4 +1,5 @@
-﻿using MailQueueNet.Service.Core;
+﻿using MailQueueNet.Core.Logging;
+using MailQueueNet.Service.Core;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -9,6 +10,9 @@ namespace MailQueueNet.Service
     {
         public static void Main(string[] args)
         {
+            MailQueueNetLogger mailQueueNetLogger = new MailQueueNetLogger();
+            mailQueueNetLogger.ConfigureLogging();
+
             CreateHostBuilder(args).Build().Run();
         }
 

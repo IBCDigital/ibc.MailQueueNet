@@ -1,9 +1,10 @@
-﻿using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
+﻿using System;
+using System.Threading.Tasks;
 using Grpc.Core;
+using MailQueueNet.Core.Logging;
 using MailQueueNet.Service.Core;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
-using System;
 
 namespace MailQueueNet.Service.GrpcServices
 {
@@ -24,6 +25,8 @@ namespace MailQueueNet.Service.GrpcServices
         {
             var success = false;
 
+            MailQueueNetLogger.LogMessage($"QueMail Received: {Coordinator.GetLongDesc(request)}", LogFileTypes.AccessLog, IBC.Logging.LogLevel.None);
+
             try
             {
                 _Coordinator.AddMail(request);
@@ -32,7 +35,10 @@ namespace MailQueueNet.Service.GrpcServices
             catch (Exception ex)
             {
                 _Logger?.LogError(ex, $"Exception thrown for QueueMail");
+                MailQueueNetLogger.LogException($"Exception thrown for QueueMail: {ex}");
             }
+
+            MailQueueNetLogger.SaveLogFiles(true);
 
             return Task.FromResult(new Grpc.MailMessageReply
             {
@@ -44,6 +50,8 @@ namespace MailQueueNet.Service.GrpcServices
         {
             var success = false;
 
+            MailQueueNetLogger.LogMessage($"QueueMailWithSettings Received: {Coordinator.GetLongDesc(request.Message)}", LogFileTypes.AccessLog, IBC.Logging.LogLevel.None);
+
             try
             {
                 _Coordinator.AddMail(request);
@@ -52,7 +60,10 @@ namespace MailQueueNet.Service.GrpcServices
             catch (Exception ex)
             {
                 _Logger?.LogError(ex, $"Exception thrown for QueueMail");
+                MailQueueNetLogger.LogException($"Exception thrown for QueueMail: {ex}");
             }
+
+            MailQueueNetLogger.SaveLogFiles(true);
 
             return Task.FromResult(new Grpc.MailMessageReply
             {

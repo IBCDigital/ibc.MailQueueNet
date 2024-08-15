@@ -1,5 +1,6 @@
 ﻿using System.Net.Mail;
 using System.Threading.Tasks;
+using MailQueueNet.Core.Logging;
 
 namespace MailQueueNet.Senders
 {
@@ -32,6 +33,7 @@ namespace MailQueueNet.Senders
 
                 smtp.Timeout = smtpSettings.ConnectionTimeout <= 0 ? 100000 : smtpSettings.ConnectionTimeout;
 
+                MailQueueNetLogger.LogMessage($"email settings: Host: {smtp.Host} Port: {smtp.Port}, Enable SSL: {smtp.EnableSsl}", LogFileTypes.EmailLog, IBC.Logging.LogLevel.None);
                 await smtp.SendMailAsync(message);
             }
 
