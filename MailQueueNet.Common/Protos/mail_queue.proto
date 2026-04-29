@@ -94,6 +94,11 @@ message Settings {
   int32 maximumConcurrentWorkers = 4;
   int32 maximumFailureRetries = 5;
   int32 maximumPauseMinutes = 7; // safeguard for pause duration
+  bool stagingMailRoutingEnabled = 9;
+  bool stagingForceMailpitOnly = 10;
+  google.protobuf.StringValue stagingSubjectPrefix = 11;
+  SmtpMailSettings stagingMailpit = 12;
+  SmtpMailSettings stagingRealSmtp = 13;
 }
 
 message SmtpMailSettings {

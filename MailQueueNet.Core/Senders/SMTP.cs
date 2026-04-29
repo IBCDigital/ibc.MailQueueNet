@@ -16,10 +16,9 @@
 // </copyright>
 namespace MailQueueNet.Senders
 {
-    using MailQueueNet.Core.Logging;
-
     using System.Net.Mail;
     using System.Threading.Tasks;
+    using MailQueueNet.Core.Logging;
 
     public class SMTP : ISender
     {

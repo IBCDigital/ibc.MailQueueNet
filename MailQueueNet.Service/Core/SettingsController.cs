@@ -112,6 +112,11 @@ namespace MailQueueNet.Service.Core
             AddOrUpdateAppSetting(jSettings, "queue:maximum_concurrent_workers", settings.MaximumConcurrentWorkers);
             AddOrUpdateAppSetting(jSettings, "queue:maximum_failure_retries", settings.MaximumFailureRetries);
             AddOrUpdateAppSetting(jSettings, "queue:maximum_pause_minutes", settings.MaximumPauseMinutes);
+            AddOrUpdateAppSetting(jSettings, "StagingMailRouting:Enabled", settings.StagingMailRoutingEnabled);
+            AddOrUpdateAppSetting(jSettings, "StagingMailRouting:ForceMailpitOnly", settings.StagingForceMailpitOnly);
+            AddOrUpdateAppSetting(jSettings, "StagingMailRouting:SubjectPrefix", settings.StagingSubjectPrefix);
+            AddOrUpdateSmtpDeliverySettings(jSettings, "StagingMailRouting:Mailpit", settings.StagingMailpit);
+            AddOrUpdateSmtpDeliverySettings(jSettings, "StagingMailRouting:RealSmtp", settings.StagingRealSmtp);
 
             CommitSettingsUpdates(jSettings);
         }
@@ -164,6 +169,41 @@ namespace MailQueueNet.Service.Core
                 MaximumConcurrentWorkers = configuration.GetValue("queue:maximum_concurrent_workers", 4),
                 MaximumFailureRetries = configuration.GetValue("queue:maximum_failure_retries", 5),
                 MaximumPauseMinutes = configuration.GetValue("queue:maximum_pause_minutes", 30),
+                StagingMailRoutingEnabled = configuration.GetValue("StagingMailRouting:Enabled", false),
+                StagingForceMailpitOnly = configuration.GetValue("StagingMailRouting:ForceMailpitOnly", true),
+                StagingSubjectPrefix = configuration.GetValue("StagingMailRouting:SubjectPrefix", "[STAGING] "),
+                StagingMailpit = GetSmtpDeliverySettings(configuration, "StagingMailRouting:Mailpit"),
+                StagingRealSmtp = GetSmtpDeliverySettings(configuration, "StagingMailRouting:RealSmtp"),
+            };
+        }
+
+        private static void AddOrUpdateSmtpDeliverySettings(JObject jSettings, string keyPrefix, Grpc.SmtpMailSettings? settings)
+        {
+            if (settings == null)
+            {
+                return;
+            }
+
+            AddOrUpdateAppSetting(jSettings, keyPrefix + ":Host", settings.Host);
+            AddOrUpdateAppSetting(jSettings, keyPrefix + ":Port", settings.Port);
+            AddOrUpdateAppSetting(jSettings, keyPrefix + ":RequiresSsl", settings.RequiresSsl);
+            AddOrUpdateAppSetting(jSettings, keyPrefix + ":RequiresAuthentication", settings.RequiresAuthentication);
+            AddOrUpdateAppSetting(jSettings, keyPrefix + ":Username", settings.Username);
+            AddOrUpdateAppSetting(jSettings, keyPrefix + ":Password", settings.Password);
+            AddOrUpdateAppSetting(jSettings, keyPrefix + ":ConnectionTimeout", settings.ConnectionTimeout);
+        }
+
+        private static Grpc.SmtpMailSettings GetSmtpDeliverySettings(IConfiguration configuration, string keyPrefix)
+        {
+            return new Grpc.SmtpMailSettings
+            {
+                Host = configuration.GetValue(keyPrefix + ":Host", string.Empty),
+                Port = configuration.GetValue(keyPrefix + ":Port", 0),
+                RequiresSsl = configuration.GetValue(keyPrefix + ":RequiresSsl", false),
+                RequiresAuthentication = configuration.GetValue(keyPrefix + ":RequiresAuthentication", false),
+                Username = configuration.GetValue(keyPrefix + ":Username", string.Empty),
+                Password = configuration.GetValue(keyPrefix + ":Password", string.Empty),
+                ConnectionTimeout = configuration.GetValue(keyPrefix + ":ConnectionTimeout", 100000),
             };
         }
 

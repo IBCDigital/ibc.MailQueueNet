@@ -21,7 +21,7 @@ services:
       - queue__failed_folder=/data/mail/failed
       - queue__mail_merge_queue_folder=/data/mail/merge
       # Persist service logs (bind-mounted so they are visible on the host)
-      - FileLogging__Path=/data/logs
+      - LoggingSettings__LogFilesFolder=/data/logs
       # Persist attachments and databases
       - Attachments__Path=/data/attachments
       - Attachments__IndexDbPath=/data/db/attachment_index.db
@@ -76,7 +76,7 @@ services:
       - ASPNETCORE_Kestrel__Certificates__Default__Path=/https/mailqueuenet.pfx
       - ASPNETCORE_Kestrel__Certificates__Default__Password=DevPassword123!
       # Persist UI logs (bind-mounted so they are visible on the host)
-      - FileLogging__Path=/data/logs
+      - LoggingSettings__LogFilesFolder=/data/logs
       # Admin mTLS client cert used when calling admin gRPC endpoints
       - AdminClientCert__Path=/https/admin-client.pfx
       - AdminClientCert__Password=5752B93EAC30EEAC8B84FE
@@ -117,7 +117,7 @@ services:
       # Persist MailForge worker state
       - mailforge__jobWorkRoot=/data/work
       - MailForge__FenceDbPath=/data/db/dispatch_fence.db
-      - FileLogging__Path=/data/logs
+      - LoggingSettings__LogFilesFolder=/data/logs
       # OpenTelemetry export to SigNoz collector on host
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://host.docker.internal:4317
       - OTEL_EXPORTER_OTLP_PROTOCOL=grpc

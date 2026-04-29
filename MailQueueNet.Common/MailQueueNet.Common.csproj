@@ -10,7 +10,7 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>MailQueueNet.Common</RootNamespace>
     <AssemblyName>MailQueueNet.Common</AssemblyName>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFrameworks>net9.0</TargetFrameworks>
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <FileAlignment>512</FileAlignment>
@@ -87,5 +87,8 @@
     <PackageReference Include="IBC.Application">
       <Version>2.1.26</Version>
     </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Logging\" />
   </ItemGroup>
 </Project>

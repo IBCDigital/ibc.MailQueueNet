@@ -82,6 +82,19 @@
                         }
                     </MudPaper>
                 </MudItem>
+
+                <MudItem xs="12">
+                    <MudPaper Class="pa-3 mt-3" Elevation="1">
+                        <MudText Typo="Typo.subtitle1">Staging Mail Routing</MudText>
+                        <MudList T="string" Dense="true">
+                            <MudListItem T="string">Enabled: @(settings.StagingMailRoutingEnabled ? "Yes" : "No")</MudListItem>
+                            <MudListItem T="string">Force Mailpit Only: @(settings.StagingForceMailpitOnly ? "Yes" : "No")</MudListItem>
+                            <MudListItem T="string">Subject Prefix: @settings.StagingSubjectPrefix</MudListItem>
+                            <MudListItem T="string">Mailpit: @FormatSmtp(settings.StagingMailpit)</MudListItem>
+                            <MudListItem T="string">Real SMTP: @FormatSmtp(settings.StagingRealSmtp)</MudListItem>
+                        </MudList>
+                    </MudPaper>
+                </MudItem>
             </MudGrid>
         }
         else
@@ -141,6 +154,39 @@
                                 <MudItem xs="12" md="4"><MudNumericField T="int" @bind-Value="editMailgun.ConnectionTimeout" Label="Timeout (ms)" Min="0" /></MudItem>
                             </MudGrid>
                         }
+                    </MudPaper>
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudPaper Class="pa-3" Elevation="1">
+                        <MudText Typo="Typo.subtitle1">Edit Staging Mail Routing</MudText>
+                        <MudGrid Class="mt-2">
+                            <MudItem xs="12" md="3"><MudSwitch T="bool" @bind-Value="editSettings.StagingMailRoutingEnabled" Color="Color.Primary" /> Enabled</MudItem>
+                            <MudItem xs="12" md="4"><MudSwitch T="bool" @bind-Value="editSettings.StagingForceMailpitOnly" Color="Color.Primary" /> Force Mailpit Only</MudItem>
+                            <MudItem xs="12" md="5"><MudTextField @bind-Value="editSettings.StagingSubjectPrefix" Label="Subject Prefix" /></MudItem>
+                        </MudGrid>
+
+                        <MudText Typo="Typo.subtitle2" Class="mt-4">Mailpit SMTP</MudText>
+                        <MudGrid Class="mt-1">
+                            <MudItem xs="12" md="6"><MudTextField @bind-Value="editSettings.StagingMailpit.Host" Label="Host" /></MudItem>
+                            <MudItem xs="12" md="3"><MudNumericField T="int" @bind-Value="editSettings.StagingMailpit.Port" Label="Port" Min="0" /></MudItem>
+                            <MudItem xs="12" md="3"><MudNumericField T="int" @bind-Value="editSettings.StagingMailpit.ConnectionTimeout" Label="Timeout (ms)" Min="0" /></MudItem>
+                            <MudItem xs="12" md="3"><MudSwitch T="bool" @bind-Value="editSettings.StagingMailpit.RequiresSsl" Color="Color.Primary" /> SSL</MudItem>
+                            <MudItem xs="12" md="3"><MudSwitch T="bool" @bind-Value="editSettings.StagingMailpit.RequiresAuthentication" Color="Color.Primary" /> Authentication</MudItem>
+                            <MudItem xs="12" md="3"><MudTextField @bind-Value="editSettings.StagingMailpit.Username" Label="Username" /></MudItem>
+                            <MudItem xs="12" md="3"><MudTextField @bind-Value="editSettings.StagingMailpit.Password" Label="Password" InputType="InputType.Password" /></MudItem>
+                        </MudGrid>
+
+                        <MudText Typo="Typo.subtitle2" Class="mt-4">Real SMTP</MudText>
+                        <MudGrid Class="mt-1">
+                            <MudItem xs="12" md="6"><MudTextField @bind-Value="editSettings.StagingRealSmtp.Host" Label="Host" /></MudItem>
+                            <MudItem xs="12" md="3"><MudNumericField T="int" @bind-Value="editSettings.StagingRealSmtp.Port" Label="Port" Min="0" /></MudItem>
+                            <MudItem xs="12" md="3"><MudNumericField T="int" @bind-Value="editSettings.StagingRealSmtp.ConnectionTimeout" Label="Timeout (ms)" Min="0" /></MudItem>
+                            <MudItem xs="12" md="3"><MudSwitch T="bool" @bind-Value="editSettings.StagingRealSmtp.RequiresSsl" Color="Color.Primary" /> SSL</MudItem>
+                            <MudItem xs="12" md="3"><MudSwitch T="bool" @bind-Value="editSettings.StagingRealSmtp.RequiresAuthentication" Color="Color.Primary" /> Authentication</MudItem>
+                            <MudItem xs="12" md="3"><MudTextField @bind-Value="editSettings.StagingRealSmtp.Username" Label="Username" /></MudItem>
+                            <MudItem xs="12" md="3"><MudTextField @bind-Value="editSettings.StagingRealSmtp.Password" Label="Password" InputType="InputType.Password" /></MudItem>
+                        </MudGrid>
                     </MudPaper>
                 </MudItem>
             </MudGrid>

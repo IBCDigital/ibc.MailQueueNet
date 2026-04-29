@@ -99,6 +99,11 @@ namespace MailFunk.Components.Pages
                 MaximumConcurrentWorkers = this.settings.MaximumConcurrentWorkers,
                 MaximumFailureRetries = this.settings.MaximumFailureRetries,
                 MaximumPauseMinutes = this.settings.MaximumPauseMinutes,
+                StagingMailRoutingEnabled = this.settings.StagingMailRoutingEnabled,
+                StagingForceMailpitOnly = this.settings.StagingForceMailpitOnly,
+                StagingSubjectPrefix = this.settings.StagingSubjectPrefix,
+                StagingMailpit = this.CloneSmtpSettings(this.settings.StagingMailpit),
+                StagingRealSmtp = this.CloneSmtpSettings(this.settings.StagingRealSmtp),
             };
 
             if (this.mailSettings?.Smtp is not null)
@@ -139,6 +144,45 @@ namespace MailFunk.Components.Pages
         private void CancelEdit()
         {
             this.editMode = false;
+        }
+
+        /// <summary>
+        /// Creates an editable copy of SMTP settings from a generated gRPC model.
+        /// </summary>
+        /// <param name="source">The source SMTP settings, or <see langword="null"/>.</param>
+        /// <returns>A writable SMTP settings instance.</returns>
+        private SmtpMailSettings CloneSmtpSettings(SmtpMailSettings? source)
+        {
+            if (source == null)
+            {
+                return new SmtpMailSettings();
+            }
+
+            return new SmtpMailSettings
+            {
+                Host = source.Host,
+                Port = source.Port,
+                RequiresSsl = source.RequiresSsl,
+                RequiresAuthentication = source.RequiresAuthentication,
+                Username = source.Username,
+                Password = source.Password,
+                ConnectionTimeout = source.ConnectionTimeout,
+            };
+        }
+
+        /// <summary>
+        /// Formats SMTP settings for compact display in read-only mode.
+        /// </summary>
+        /// <param name="settings">The SMTP settings to describe.</param>
+        /// <returns>A short, user-facing SMTP endpoint description.</returns>
+        private string FormatSmtp(SmtpMailSettings? settings)
+        {
+            if (settings == null || string.IsNullOrWhiteSpace(settings.Host))
+            {
+                return "Not configured";
+            }
+
+            return $"{settings.Host}:{settings.Port} SSL={(settings.RequiresSsl ? "Yes" : "No")} Auth={(settings.RequiresAuthentication ? "Yes" : "No")}";
         }
 
         /// <summary>
