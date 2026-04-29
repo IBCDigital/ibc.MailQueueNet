@@ -1,8 +1,19 @@
-//-----------------------------------------------------------------------
 // <copyright file="AttachmentQueryCursor.cs" company="IBC Digital">
 //   Copyright (c) IBC Digital. All rights reserved.
+//
+//  Derived from “MailQueueNet” by Daniel Cohen Gindi
+//  (https://github.com/danielgindi/MailQueueNet).
+//
+//  Original portions:
+//    © 2014 Daniel Cohen Gindi (danielgindi@gmail.com)
+//    Licensed under the MIT Licence.
+//  Modifications and additions:
+//    © 2025 IBC Digital Pty Ltd
+//    Distributed under the same MIT Licence.
+//
+//  The above notice and this permission notice shall be included in
+//  all copies or substantial portions of this file.
 // </copyright>
-//-----------------------------------------------------------------------
 
 namespace MailQueueNet.Service.Core
 {
@@ -70,28 +81,6 @@ namespace MailQueueNet.Service.Core
             }
         }
 
-        /// <summary>
-        /// Converts this cursor to an opaque token suitable for returning to clients.
-        /// </summary>
-        /// <returns>A base64 encoded page token.</returns>
-        public string ToPageToken()
-        {
-            var raw = this.UploadedUtc.ToString("o", CultureInfo.InvariantCulture) + "|" + (this.Token ?? string.Empty);
-            var bytes = Encoding.UTF8.GetBytes(raw);
-            return Convert.ToBase64String(bytes);
-        }
-
-        internal sealed class ExtendedCursor
-        {
-            public long Length { get; set; }
-
-            public int RefCount { get; set; }
-
-            public DateTimeOffset UploadedUtc { get; set; }
-
-            public string Token { get; set; } = string.Empty;
-        }
-
         public static ExtendedCursor? TryParseExtended(string? extendedPageToken)
         {
             if (string.IsNullOrWhiteSpace(extendedPageToken))
@@ -143,6 +132,28 @@ namespace MailQueueNet.Service.Core
             {
                 return null;
             }
+        }
+
+        /// <summary>
+        /// Converts this cursor to an opaque token suitable for returning to clients.
+        /// </summary>
+        /// <returns>A base64 encoded page token.</returns>
+        public string ToPageToken()
+        {
+            var raw = this.UploadedUtc.ToString("o", CultureInfo.InvariantCulture) + "|" + (this.Token ?? string.Empty);
+            var bytes = Encoding.UTF8.GetBytes(raw);
+            return Convert.ToBase64String(bytes);
+        }
+
+        internal sealed class ExtendedCursor
+        {
+            public long Length { get; set; }
+
+            public int RefCount { get; set; }
+
+            public DateTimeOffset UploadedUtc { get; set; }
+
+            public string Token { get; set; } = string.Empty;
         }
     }
 }

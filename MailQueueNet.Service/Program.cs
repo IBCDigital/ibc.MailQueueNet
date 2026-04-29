@@ -1,5 +1,18 @@
-ï»¿// <copyright file="Program.cs" company="IBC Digital">
-// Copyright (c) IBC Digital. All rights reserved.
+// <copyright file="Program.cs" company="IBC Digital">
+//   Copyright (c) IBC Digital. All rights reserved.
+//
+//  Derived from “MailQueueNet” by Daniel Cohen Gindi
+//  (https://github.com/danielgindi/MailQueueNet).
+//
+//  Original portions:
+//    © 2014 Daniel Cohen Gindi (danielgindi@gmail.com)
+//    Licensed under the MIT Licence.
+//  Modifications and additions:
+//    © 2025 IBC Digital Pty Ltd
+//    Distributed under the same MIT Licence.
+//
+//  The above notice and this permission notice shall be included in
+//  all copies or substantial portions of this file.
 // </copyright>
 
 namespace MailQueueNet.Service
@@ -8,7 +21,7 @@ namespace MailQueueNet.Service
     using System.Collections.Generic;
     using System.IO;
     using System.Net.Security;
-    using MailQueueNet.Common.Logging;
+    using MailQueueNet.Core.Logging;
     using MailQueueNet.Service.Core;
     using Microsoft.AspNetCore.Hosting;
     using Microsoft.AspNetCore.Server.Kestrel.Https;
@@ -36,6 +49,8 @@ namespace MailQueueNet.Service
             return Host.CreateDefaultBuilder(args)
                 .ConfigureAppConfiguration((context, config) =>
                 {
+                    config.AddJsonFile("appsettings.Environment.json", optional: true, reloadOnChange: true);
+
                     var overridesPath = ResolveOverridesPath();
                     if (File.Exists(overridesPath))
                     {
@@ -44,23 +59,7 @@ namespace MailQueueNet.Service
                 })
                 .ConfigureLogging((ctx, logging) =>
                 {
-                    var cfg = ctx.Configuration.GetSection("FileLogging");
-                    var path = cfg["Path"] ?? "Logs";
-                    var limitMb = cfg.GetValue<int?>("FileSizeLimitMb") ?? 10;
-                    var maxFiles = cfg.GetValue<int?>("MaxFiles") ?? 10;
-
-                    var contentRoot = ctx.HostingEnvironment.ContentRootPath ?? AppContext.BaseDirectory;
-                    var basePath = System.IO.Path.IsPathRooted(path) ? path : System.IO.Path.Combine(contentRoot, path);
-                    System.IO.Directory.CreateDirectory(basePath);
-
-                    var bytes = limitMb * 1024 * 1024;
-
-                    // Split providers by category prefix so we get separate files per type
-                    logging.AddProvider(new SimpleFileLoggerProvider(basePath, bytes, maxFiles, filePrefix: "admin", allowedCategoryPrefix: "Admin"));
-                    logging.AddProvider(new SimpleFileLoggerProvider(basePath, bytes, maxFiles, filePrefix: "mailreq", allowedCategoryPrefix: "MailRequest"));
-                    logging.AddProvider(new SimpleFileLoggerProvider(basePath, bytes, maxFiles, filePrefix: "sent", allowedCategoryPrefix: "MailSent"));
-                    logging.AddProvider(new SimpleFileLoggerProvider(basePath, bytes, maxFiles, filePrefix: "failed", allowedCategoryPrefix: "MailFailed"));
-                    logging.AddProvider(new SimpleFileLoggerProvider(basePath, bytes, maxFiles, filePrefix: "service")); // catch-all
+                    MailQueueNetLogger.ConfigureFrom(ctx.Configuration);
                 })
                 .UseConsoleLifetime()
 #if Linux || Portable

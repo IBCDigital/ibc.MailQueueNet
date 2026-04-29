@@ -1,18 +1,18 @@
-Ôªø// <copyright file="WebStartup.cs" company="IBC Digital">
-// Copyright (c) IBC Digital. All rights reserved.
+// <copyright file="WebStartup.cs" company="IBC Digital">
+//   Copyright (c) IBC Digital. All rights reserved.
 //
-// Derived from ‚ÄúMailQueueNet‚Äù by Daniel Cohen Gindi
-// (https://github.com/danielgindi/MailQueueNet).
+//  Derived from ìMailQueueNetî by Daniel Cohen Gindi
+//  (https://github.com/danielgindi/MailQueueNet).
 //
-// Original portions:
-// ¬©2014 Daniel Cohen Gindi (danielgindi@gmail.com)
-// Licensed under the MIT Licence.
-// Modifications and additions:
-// ¬©2025 IBC Digital Pty Ltd
-// Distributed under the same MIT Licence.
+//  Original portions:
+//    © 2014 Daniel Cohen Gindi (danielgindi@gmail.com)
+//    Licensed under the MIT Licence.
+//  Modifications and additions:
+//    © 2025 IBC Digital Pty Ltd
+//    Distributed under the same MIT Licence.
 //
-// The above notice and this permission notice shall be included in
-// all copies or substantial portions of this file.
+//  The above notice and this permission notice shall be included in
+//  all copies or substantial portions of this file.
 // </copyright>
 
 namespace MailQueueNet.Service
@@ -157,7 +157,8 @@ namespace MailQueueNet.Service
 
             var logger = app.ApplicationServices.GetRequiredService<ILogger<WebStartup>>();
             var serverAddresses = app.ServerFeatures.Get<Microsoft.AspNetCore.Hosting.Server.Features.IServerAddressesFeature>()?.Addresses;
-            logger.LogInformation("Env: ASPNETCORE_URLS={Urls}; HTTP_PORTS={Hp}; HTTPS_PORTS={Hs}",
+            logger.LogInformation(
+                "Env: ASPNETCORE_URLS={Urls}; HTTP_PORTS={Hp}; HTTPS_PORTS={Hs}",
                 Environment.GetEnvironmentVariable("ASPNETCORE_URLS") ?? string.Empty,
                 Environment.GetEnvironmentVariable("ASPNETCORE_HTTP_PORTS") ?? string.Empty,
                 Environment.GetEnvironmentVariable("ASPNETCORE_HTTPS_PORTS") ?? string.Empty);

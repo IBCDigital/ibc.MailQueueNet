@@ -20,9 +20,7 @@
 
 namespace MailQueueNet.Grpc
 {
-#if NET9_0_OR_GREATER         // <-- builds only for net9.0
     using IBC.Application;
-#endif
 
     using Microsoft.Extensions.Configuration;
 
@@ -52,7 +50,6 @@ namespace MailQueueNet.Grpc
         /// </summary>
         public MailClientConfiguration()
         {
-#if NET9_0_OR_GREATER         // <-- builds only for net9.0
             if (Current == null)
             {
                 lock (Mutex)
@@ -70,7 +67,6 @@ namespace MailQueueNet.Grpc
                     }
                 }
             }
-#endif
         }
 
         /// <summary>

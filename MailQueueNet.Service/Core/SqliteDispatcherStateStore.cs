@@ -606,6 +606,7 @@ ON CONFLICT(merge_id) DO UPDATE SET
         /// <summary>
         /// Describes the dispatch state for a merge identifier.
         /// </summary>
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.OrderingRules", "SA1201:Elements should appear in the correct order", Justification = "Keeping this public enum nested with the dispatcher state store avoids a larger public API move in this cleanup.")]
         public enum MergeJobDispatchStatus
         {
             /// <summary>

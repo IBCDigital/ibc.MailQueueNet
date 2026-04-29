@@ -14,9 +14,10 @@
 //  The above notice and this permission notice shall be included in
 //  all copies or substantial portions of this file.
 // </copyright>
-
 namespace MailQueueNet.Senders
 {
+    using MailQueueNet.Core.Logging;
+
     using System.Net.Mail;
     using System.Threading.Tasks;
 
@@ -48,6 +49,8 @@ namespace MailQueueNet.Senders
                 smtp.EnableSsl = smtpSettings.RequiresSsl;
 
                 smtp.Timeout = smtpSettings.ConnectionTimeout <= 0 ? 100000 : smtpSettings.ConnectionTimeout;
+
+                MailQueueNetLogger.LogMessage($"email settings: Host: {smtp.Host} Port: {smtp.Port}, Enable SSL: {smtp.EnableSsl}", LogFileTypes.EmailLog, IBC.Logging.LogLevel.None);
 
                 await smtp.SendMailAsync(message);
             }

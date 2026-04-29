@@ -10,7 +10,7 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>MailQueueNet.Core</RootNamespace>
     <AssemblyName>MailQueueNet.Core</AssemblyName>
-    <TargetFrameworks>netstandard2.1;net9.0</TargetFrameworks>
+    <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <FileAlignment>512</FileAlignment>
@@ -65,6 +65,15 @@
     <PackageReference Include="StyleCop.Analyzers.Unstable" Version="1.2.0.556">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="IBC.Application">
+      <Version>2.1.26</Version>
+    </PackageReference>
+    <PackageReference Include="IBC.Logging">
+      <Version>3.0.14</Version>
     </PackageReference>
   </ItemGroup>
 </Project>

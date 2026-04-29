@@ -11,7 +11,7 @@ namespace MailForge
     using MailForge.Security;
     using MailForge.Services;
     using MailForge.Template;
-    using MailQueueNet.Common.Logging;
+    using MailQueueNet.Core.Logging;
     using Microsoft.AspNetCore.Authentication.Certificate;
     using Microsoft.AspNetCore.Authorization;
     using Microsoft.AspNetCore.Builder;
@@ -42,6 +42,8 @@ namespace MailForge
             AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
 
             var builder = WebApplication.CreateBuilder(args);
+            builder.Configuration.AddJsonFile("appsettings.Environment.json", optional: true, reloadOnChange: true);
+            ConfigureLogging(builder);
 
             builder.Services.AddGrpc();
             builder.Services.AddHealthChecks();
@@ -154,7 +156,6 @@ namespace MailForge
 
             builder.Services.AddSingleton<IMergeJobRunner, MergeJobRunner>();
 
-            ConfigureLogging(builder);
             ConfigureOpenTelemetry(builder);
 
             var app = builder.Build();
@@ -172,17 +173,7 @@ namespace MailForge
 
         private static void ConfigureLogging(WebApplicationBuilder builder)
         {
-            var cfg = builder.Configuration;
-            var logPath = cfg["FileLogging:Path"];
-            if (string.IsNullOrWhiteSpace(logPath))
-            {
-                logPath = "/data/logs";
-            }
-
-            builder.Logging.ClearProviders();
-            builder.Logging.AddConsole();
-            builder.Logging.AddProvider(new SimpleFileLoggerProvider(logPath, "mailforge"));
-
+            MailQueueNetLogger.ConfigureFrom(builder.Configuration);
             builder.Logging.SetMinimumLevel(LogLevel.Information);
         }
 

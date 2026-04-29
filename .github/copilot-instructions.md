@@ -335,3 +335,9 @@ To enforce some of the above automatically, consider these settings in your `sty
 
 - For the staging-only mail-routing allow-list feature, clients should manage their own lists using **client shared-secret authentication** rather than **admin authentication**. However, MailFunk should also be able to manage any client's list using admin credentials.
 - Real SMTP deliveries should include a **subject marker**.
+
+---
+
+## 11) .NET Support
+
+- Drop **.NET Standard** support for the ibc.MailQueueNet repository and target **.NET 9 only** because the targeted .NET Standard version does not support the original .NET Framework compatibility goal.

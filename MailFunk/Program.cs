@@ -14,8 +14,8 @@ namespace MailFunk
     using System.Security.Cryptography.X509Certificates;
     using System.Text.Json;
     using MailFunk.Components;
-    using MailFunk.Logging;
     using MailFunk.Services;
+    using MailQueueNet.Core.Logging;
     using Microsoft.AspNetCore.Authentication;
     using Microsoft.AspNetCore.Authentication.Cookies;
     using Microsoft.AspNetCore.Authentication.Negotiate;
@@ -51,6 +51,7 @@ namespace MailFunk
             AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
 
             var builder = WebApplication.CreateBuilder(args);
+            builder.Configuration.AddJsonFile("appsettings.Environment.json", optional: true, reloadOnChange: true);
 
             if (string.IsNullOrWhiteSpace(builder.Configuration["AzureAd:Instance"]))
             {
@@ -75,8 +76,7 @@ namespace MailFunk
                 });
             }
 
-            // Add custom file logging (must be before Build()).
-            builder.Logging.AddSimpleFile(builder.Configuration, builder.Environment.ContentRootPath);
+            ConfigureLogging(builder);
 
             ConfigureOpenTelemetry(builder);
 
@@ -453,6 +453,12 @@ namespace MailFunk
                     .AddRuntimeInstrumentation()
                     .AddHttpClientInstrumentation()
                     .AddOtlpExporter());
+        }
+
+        private static void ConfigureLogging(WebApplicationBuilder builder)
+        {
+            MailQueueNetLogger.ConfigureFrom(builder.Configuration);
+            builder.Logging.SetMinimumLevel(LogLevel.Information);
         }
 
         private static HttpMessageHandler CreateGrpcHttpHandler(WebApplicationBuilder builder, X509Certificate2? adminClientCert)

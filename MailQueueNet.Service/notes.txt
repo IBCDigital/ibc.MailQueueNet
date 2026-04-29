@@ -1,0 +1,9 @@
+sc delete MailQueueNet
+
+//release
+sc create MailQueueNet binPath="C:\Development\Apps\ibc.MailQueueNet\_Release\Service\net8.0\MailQueueNet.Service.exe" start=auto DisplayName="Mail Queue Net"
+
+// debug
+sc create MailQueueNet binPath="C:\Development\Apps\ibc.MailQueueNet\_Debug\net8.0\MailQueueNet.Service.exe" start=auto DisplayName="Mail Queue Net"
+
+sc start MailQueueNet

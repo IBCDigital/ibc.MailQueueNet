@@ -20,6 +20,8 @@
   
   <ItemGroup>
     <PackageReference Include="Blazor-ApexCharts" Version="6.1.0" />
+    <PackageReference Include="IBC.Application" Version="2.1.26" />
+    <PackageReference Include="IBC.Logging" Version="3.0.14" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="9.0.15" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.Negotiate" Version="9.0.15" />
     <PackageReference Include="Microsoft.Identity.Web" Version="4.8.0" />
@@ -40,6 +42,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\MailQueueNet.Common\MailQueueNet.Common.csproj" />
+    <ProjectReference Include="..\MailQueueNet.Core\MailQueueNet.Core.csproj" />
   </ItemGroup>
 
 </Project>

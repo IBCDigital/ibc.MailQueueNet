@@ -1,8 +1,19 @@
-//-----------------------------------------------------------------------
 // <copyright file="SqliteAttachmentIndexStore.cs" company="IBC Digital">
 //   Copyright (c) IBC Digital. All rights reserved.
+//
+//  Derived from “MailQueueNet” by Daniel Cohen Gindi
+//  (https://github.com/danielgindi/MailQueueNet).
+//
+//  Original portions:
+//    © 2014 Daniel Cohen Gindi (danielgindi@gmail.com)
+//    Licensed under the MIT Licence.
+//  Modifications and additions:
+//    © 2025 IBC Digital Pty Ltd
+//    Distributed under the same MIT Licence.
+//
+//  The above notice and this permission notice shall be included in
+//  all copies or substantial portions of this file.
 // </copyright>
-//-----------------------------------------------------------------------
 
 namespace MailQueueNet.Service.Core
 {
@@ -623,6 +634,7 @@ FROM attachments ");
             return string.Empty;
         }
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.OrderingRules", "SA1204:Static elements should appear before instance elements", Justification = "Keeping SQLite parsing helpers with the query implementation preserves readability.")]
         private static DateTimeOffset ParseUtc(string value)
         {
             if (DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var parsed))
@@ -712,6 +724,7 @@ CREATE INDEX IF NOT EXISTS idx_attachments_length ON attachments(length);
         /// <param name="mergeOwnerId">Merge owner id when known; otherwise empty.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.OrderingRules", "SA1202:Elements should be ordered by access", Justification = "Keeping this external update operation near schema/update helpers preserves SQLite store readability.")]
         public async Task UpdateRefCountAndMergeOwnerIdAsync(string dbPath, string token, int refCount, string mergeOwnerId, CancellationToken cancellationToken)
         {
             if (string.IsNullOrWhiteSpace(token))

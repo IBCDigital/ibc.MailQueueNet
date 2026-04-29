@@ -10,7 +10,7 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>MailQueueNet.Common</RootNamespace>
     <AssemblyName>MailQueueNet.Common</AssemblyName>
-	<TargetFrameworks>net9.0;netstandard2.1</TargetFrameworks>
+    <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <FileAlignment>512</FileAlignment>
@@ -83,7 +83,7 @@
     </PackageReference>
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="9.0.11" />
   </ItemGroup>
-  <ItemGroup Condition="'$(TargetFramework)' == 'net9.0'">
+  <ItemGroup>
     <PackageReference Include="IBC.Application">
       <Version>2.1.26</Version>
     </PackageReference>

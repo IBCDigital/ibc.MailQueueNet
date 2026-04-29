@@ -20,8 +20,8 @@ namespace MailQueueNet.Service.Core
     using System;
     using System.Collections.Concurrent;
     using System.Collections.Generic;
-    using System.Globalization;
     using System.Diagnostics;
+    using System.Globalization;
     using System.IO;
     using System.Linq;
     using System.Net.Mail;
@@ -32,20 +32,22 @@ namespace MailQueueNet.Service.Core
     using global::Grpc.Core;
     using MailForge.Grpc;
     using MailQueueNet.Common.FileExtensions;
+    using MailQueueNet.Service.Core.Telemetry;
     using MailQueueNet.Service.Utilities;
     using Microsoft.Extensions.Configuration;
     using Microsoft.Extensions.Logging;
-    using MailQueueNet.Service.Core.Telemetry;
 
     public class Coordinator
     {
         private const string AttemptHeaderName = "X-Attempt-Count";
         private const string ClientIdHeaderName = "X-Client-ID";
+        private const string DefaultStateDbFileName = "dispatcher_state.db";
         private const int MaxReasonLength = 200;
+        private const string MissingTokenFailFastConfigKey = "Attachments:FailFastOnMissingTokens";
+        private const string TokenInlineAsLinkedResourcesConfigKey = "Attachments:TokenInlineAsLinkedResources";
 
         private static readonly TimeSpan MergeFolderPollInterval = TimeSpan.FromSeconds(2);
         private static readonly TimeSpan AttachmentCleanupInterval = TimeSpan.FromMinutes(5);
-        private const string DefaultStateDbFileName = "dispatcher_state.db";
         private static readonly TimeSpan MergePumpInterval = TimeSpan.FromSeconds(1);
         private static readonly TimeSpan MergeReopenWindow = TimeSpan.FromMinutes(60);
 
@@ -86,9 +88,6 @@ namespace MailQueueNet.Service.Core
 
         private DateTimeOffset lastAttachmentCleanupUtc = DateTimeOffset.UtcNow;
 
-        private const string MissingTokenFailFastConfigKey = "Attachments:FailFastOnMissingTokens";
-        private const string TokenInlineAsLinkedResourcesConfigKey = "Attachments:TokenInlineAsLinkedResources";
-
         public Coordinator(ILogger<Coordinator> logger, ILoggerFactory loggerFactory, IConfiguration configuration, IMailForgeDispatcher dispatcher, IStagingMailRouter stagingMailRouter, SqliteDispatcherStateStore stateStore, IAttachmentIndexNotifier attachmentIndexNotifier)
         {
             this.logger = logger;
@@ -108,6 +107,21 @@ namespace MailQueueNet.Service.Core
         public bool IsPaused => this.pausedUntilUtc.HasValue && this.pausedUntilUtc.Value > DateTime.UtcNow;
 
         public (bool IsPaused, string PausedBy, DateTime? PausedAtUtc, DateTime? AutoResumeUtc) GetPauseStatus() => (this.IsPaused, this.pausedByUser, this.pausedAtUtc, this.pausedUntilUtc);
+
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.OrderingRules", "SA1204:Static elements should appear before instance elements", Justification = "This public helper is kept with the public coordinator API.")]
+        public static string GetLongDesc(Grpc.MailMessage message)
+        {
+            if (message == null)
+            {
+                return string.Empty;
+            }
+
+            var to = message.To == null ? string.Empty : string.Join(",", message.To);
+            var cc = message.Cc == null ? string.Empty : string.Join(",", message.Cc);
+            var bcc = message.Bcc == null ? string.Empty : string.Join(",", message.Bcc);
+
+            return $"From={message.From}; To={to}; Cc={cc}; Bcc={bcc}; Subject='{message.Subject}'";
+        }
 
         public void RefreshSettings()
         {
@@ -470,6 +484,7 @@ namespace MailQueueNet.Service.Core
             }
         }
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.OrderingRules", "SA1204:Static elements should appear before instance elements", Justification = "Keeping attempt-header helpers near queue file operations preserves readability in this large coordinator.")]
         private static void SetAttemptHeader(Grpc.MailMessageWithSettings wrapper, int attempt)
         {
             if (wrapper?.Message == null)
@@ -1064,10 +1079,12 @@ namespace MailQueueNet.Service.Core
                     GetMergeJobStatusReply status;
                     try
                     {
-                        status = await this.dispatcher.GetMergeJobStatusAsync(new GetMergeJobStatusRequest
-                        {
-                            JobId = mergeId,
-                        }, cancellationToken).ConfigureAwait(false);
+                        status = await this.dispatcher.GetMergeJobStatusAsync(
+                            new GetMergeJobStatusRequest
+                            {
+                                JobId = mergeId,
+                            },
+                            cancellationToken).ConfigureAwait(false);
                     }
                     catch (Exception ex)
                     {
@@ -1150,13 +1167,15 @@ namespace MailQueueNet.Service.Core
                         AppendMergeBatchReply appendReply;
                         try
                         {
-                            appendReply = await this.dispatcher.AppendMergeBatchAsync(new AppendMergeBatchRequest
-                            {
-                                MergeId = mergeId,
-                                TemplateFileName = templateName,
-                                BatchId = batchId,
-                                JsonLines = { payload },
-                            }, cancellationToken).ConfigureAwait(false);
+                            appendReply = await this.dispatcher.AppendMergeBatchAsync(
+                                new AppendMergeBatchRequest
+                                {
+                                    MergeId = mergeId,
+                                    TemplateFileName = templateName,
+                                    BatchId = batchId,
+                                    JsonLines = { payload },
+                                },
+                                cancellationToken).ConfigureAwait(false);
                         }
                         catch (Exception ex)
                         {
@@ -1294,6 +1313,7 @@ namespace MailQueueNet.Service.Core
             }
         }
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.OrderingRules", "SA1204:Static elements should appear before instance elements", Justification = "Keeping merge pump helper near its only call site preserves readability in this large coordinator.")]
         private static int TryExtractBatchId(string fullPath)
         {
             // Expected suffix: ".<batchId>.jsonl"
@@ -1598,6 +1618,7 @@ namespace MailQueueNet.Service.Core
             }
         }
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.OrderingRules", "SA1204:Static elements should appear before instance elements", Justification = "Keeping merge dispatch helper near its only call site preserves readability in this large coordinator.")]
         private static string TryExtractMergeIdFromTemplateFileName(string templateFileName)
         {
             // Expected: yyyyMMddHHmmss_<mergeId>_<counter>.mail
@@ -1856,6 +1877,7 @@ namespace MailQueueNet.Service.Core
             }
         }
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.OrderingRules", "SA1201:Elements should appear in the correct order", Justification = "Keeping this formatter near the nested result type preserves readability in this large coordinator.")]
         private string ToSingleLineReason(string? raw)
         {
             if (string.IsNullOrWhiteSpace(raw))

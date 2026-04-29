@@ -51,11 +51,14 @@ namespace MailQueueNet.Service
             try
             {
                 this.registeredOnChange?.Dispose();
-                this.registeredOnChange = ChangeToken.OnChange<object>(this.configuration.GetReloadToken, async (_) => await this.debouncer.Debounce(() =>
-                {
-                    this.coordinator.RefreshSettings();
-                    this.dispatcher.RefreshSettings();
-                }), null);
+                this.registeredOnChange = ChangeToken.OnChange<object>(
+                    this.configuration.GetReloadToken,
+                    async (_) => await this.debouncer.Debounce(() =>
+                    {
+                        this.coordinator.RefreshSettings();
+                        this.dispatcher.RefreshSettings();
+                    }),
+                    null);
 
                 this.coordinator.RefreshSettings();
                 this.dispatcher.RefreshSettings();

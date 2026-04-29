@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\MailQueueNet.Common\MailQueueNet.Common.csproj" />
+    <ProjectReference Include="..\MailQueueNet.Core\MailQueueNet.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -30,6 +31,8 @@
     <PackageReference Include="Grpc.AspNetCore" Version="2.76.0" />
     <PackageReference Include="Grpc.Net.Client" Version="2.76.0" />
     <PackageReference Include="Handlebars.Net" Version="2.1.6" />
+    <PackageReference Include="IBC.Application" Version="2.1.26" />
+    <PackageReference Include="IBC.Logging" Version="3.0.14" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.Certificate" Version="9.0.15" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.7" />
     <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.3" />
