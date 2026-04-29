@@ -1,0 +1,55 @@
+﻿<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="/">
+            <img src="images/mailfunk_wordmark_transparent.png" alt="MailFunk" class="brand-wordmark" />
+        </a>
+    </div>
+</div>
+
+<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+
+<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
+    <nav class="nav flex-column">
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="test-mail">
+                <span class="bi bi-envelope-paper-fill" aria-hidden="true"></span> Test Mail
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="settings">
+                <span class="bi bi-gear-fill" aria-hidden="true"></span> Server Settings
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="logs">
+                <span class="bi bi-journal-text" aria-hidden="true"></span> Logs
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="mailforge">
+                <span class="bi bi-diagram-3-fill" aria-hidden="true"></span> MailForge
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="client-generator">
+                <span class="bi bi-shield-lock" aria-hidden="true"></span> Client Generator
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="attachments">
+                <span class="bi bi-paperclip" aria-hidden="true"></span> Attachments
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="allowed-test-recipients">
+                <span class="bi bi-person-check-fill" aria-hidden="true"></span> Allowed Test Recipients
+            </NavLink>
+        </div>
+    </nav>
+</div>
+

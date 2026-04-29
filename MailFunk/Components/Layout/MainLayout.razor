@@ -1,0 +1,70 @@
+﻿@inherits LayoutComponentBase
+@inject MailFunk.Services.IUserProfileService UserProfileService
+@inject NavigationManager Nav
+
+<div class="ibc-header">
+    <a class="brand" href="/">
+        <img src="images/ibc-logo-big.png" alt="IBC Digital" />
+    </a>
+    <span class="ms-auto"></span>
+    <ServiceStatus />
+
+    <MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight" Dense="true">
+        <ActivatorContent>
+            @if (profile is null)
+            {
+                <MudProgressCircular Indeterminate Size="Size.Small" />
+            }
+            else if (!string.IsNullOrWhiteSpace(profile.PhotoBase64))
+            {
+                <MudAvatar Size="Size.Medium">
+                    <MudImage Src="@profile.PhotoBase64" Alt="User" Style="width:100%;height:100%;object-fit:cover;" />
+                </MudAvatar>
+            }
+            else if (!string.IsNullOrWhiteSpace(profile.Initials))
+            {
+                <MudAvatar Color="Color.Primary" Size="Size.Medium">@profile.Initials</MudAvatar>
+            }
+            else
+            {
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="@(()=> Nav.NavigateTo("/signin", true))">Sign in</MudButton>
+            }
+        </ActivatorContent>
+        <ChildContent>
+            @if (profile != null && (!string.IsNullOrWhiteSpace(profile.DisplayName) || !string.IsNullOrWhiteSpace(profile.Email)))
+            {
+                <MudListItem T="string" Disabled="true" Class="px-3 pt-2 pb-0" Style="cursor:default;">@profile.DisplayName</MudListItem>
+                <MudListItem T="string" Disabled="true" Class="px-3 pb-1" Style="cursor:default;">@profile.Email</MudListItem>
+                <MudDivider />
+            }
+            <MudMenuItem OnClick="@(()=> Nav.NavigateTo("/signout", true))">Sign out</MudMenuItem>
+        </ChildContent>
+    </MudMenu>
+</div>
+
+<div class="page">
+    <div class="sidebar">
+        <NavMenu />
+    </div>
+
+    <main>
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">🗙</span>
+</div>
+
+@code {
+    private MailFunk.Services.UserProfile? profile;
+
+    protected override async Task OnInitializedAsync()
+    {
+        this.profile = await this.UserProfileService.GetAsync();
+    }
+}

@@ -1,0 +1,11 @@
+@using MailFunk.Models
+
+<MudTreeViewItem T="JsonTreeNode" Text="@this.Node.DisplayText" Value="this.Node">
+    @if (this.Node.Children.Count > 0)
+    {
+        @foreach (var child in this.Node.Children)
+        {
+            <JsonTreeViewItem Node="child" />
+        }
+    }
+</MudTreeViewItem>

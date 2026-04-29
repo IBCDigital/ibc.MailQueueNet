@@ -1,0 +1,35 @@
+// ...
+service MailGrpcService {
+  // existing...
+  rpc GetServiceConfig (GetServiceConfigRequest) returns (GetServiceConfigReply);
+
+  // recommended new endpoints:
+  rpc GetFolderSummary (GetFolderSummaryRequest) returns (GetFolderSummaryReply);
+  rpc ListFolderFiles (ListFolderFilesRequest) returns (ListFolderFilesReply);
+}
+
+message GetFolderSummaryRequest {}
+message GetFolderSummaryReply {
+  int32 queue_count = 1;
+  int32 failed_count = 2;
+  string queue_path = 3;   // absolute
+  string failed_path = 4;  // absolute
+}
+
+message ListFolderFilesRequest {
+  enum FolderKind { QUEUE = 0; FAILED = 1; }
+  FolderKind folder = 1;
+  int32 skip = 2;
+  int32 take = 3;
+}
+message MailFileEntryDto {
+  string name = 1;
+  string full_path = 2;
+  int64 size_bytes = 3;
+  string created_utc = 4;
+  string modified_utc = 5;
+}
+message ListFolderFilesReply {
+  repeated MailFileEntryDto files = 1;
+  int32 total = 2;
+}

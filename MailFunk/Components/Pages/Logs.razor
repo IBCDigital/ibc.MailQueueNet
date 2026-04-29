@@ -1,0 +1,75 @@
+@page "/logs"
+@using MailQueueNet.Grpc
+
+<PageTitle>Logs</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.False">
+    <MudGrid>
+        <MudItem xs="12" md="4" lg="3">
+            <MudPaper Class="pa-3" Elevation="1">
+                <MudText Typo="Typo.subtitle1">Source</MudText>
+                <MudRadioGroup T="string" Value="@this.source" ValueChanged="this.OnSourceChanged">
+                    <MudRadio T="string" Value="@("mailfunk")">MailFunk</MudRadio>
+                    <MudRadio T="string" Value="@("server")">Mail Queue Server</MudRadio>
+                    <MudRadio T="string" Value="@("mailforge")">MailForge</MudRadio>
+                </MudRadioGroup>
+
+                <MudDivider Class="my-2" />
+
+                <div class="d-flex justify-space-between align-center mb-1">
+                    <MudText Typo="Typo.subtitle1">Files</MudText>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" OnClick="this.LoadFilesAsync" Disabled="@this.listBusy">Refresh</MudButton>
+                </div>
+
+                @if (this.listBusy)
+                {
+                    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+                }
+                else
+                {
+                    <MudList T="string" Dense="true">
+                        @if (this.source == "mailfunk")
+                        {
+                            @foreach (var f in this.mfFiles)
+                            {
+                                <MudListItem T="string" OnClick="(() => this.OnFileSelectedAsync(f))" Class="cursor-pointer">@f</MudListItem>
+                            }
+                        }
+                        else if (this.source == "server")
+                        {
+                            @foreach (var f in this.srvFiles)
+                            {
+                                <MudListItem T="string" OnClick="(() => this.OnFileSelectedAsync(f))" Class="cursor-pointer">@f</MudListItem>
+                            }
+                        }
+                        else
+                        {
+                            @foreach (var f in this.forgeFiles)
+                            {
+                                <MudListItem T="string" OnClick="(() => this.OnFileSelectedAsync(f))" Class="cursor-pointer">@f</MudListItem>
+                            }
+                        }
+                    </MudList>
+                }
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="8" lg="9">
+            <MudPaper Class="pa-3" Elevation="1">
+                <div class="d-flex justify-space-between align-center mb-2">
+                    <MudText Typo="Typo.subtitle1">@(this.selectedFile ?? "No file selected")</MudText>
+                    <div class="d-flex align-center gap-2">
+                        <MudSwitch T="bool" @bind-Value="this.live" Disabled="@(this.source == "mailfunk")" />
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="this.LoadContentAsync" Disabled="@string.IsNullOrWhiteSpace(this.selectedFile)">Reload</MudButton>
+                    </div>
+                </div>
+
+                @if (this.contentBusy)
+                {
+                    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+                }
+
+                <MudPaper Class="pa-2" Elevation="0" Style="white-space:pre; overflow:auto; max-height:65vh;">@this.content</MudPaper>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+</MudContainer>

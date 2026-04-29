@@ -1,0 +1,285 @@
+@page "/test-mail"
+@using MailForge.Grpc
+
+<PageTitle>Test Mail</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large">
+    <MudText Typo="Typo.h5" Class="mb-2">Test Mail</MudText>
+
+    <MudAlert Severity="Severity.Info" Class="mb-3">
+        Sends mail via the queue server using the client helper methods. Configure the server connection details and message fields below.
+    </MudAlert>
+
+    @if (!string.IsNullOrWhiteSpace(error))
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-2">@error</MudAlert>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(status))
+    {
+        <MudAlert Severity="Severity.Success" Class="mb-2">@status</MudAlert>
+    }
+
+    <MudTabs>
+        <MudTabPanel Text="Standard mail">
+            <MudPaper Class="pa-3" Elevation="1">
+                <MudGrid>
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.subtitle1">Queue server</MudText>
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudTextField
+                            @bind-Value="mailServiceBaseAddress"
+                            Label="MailService BaseAddress"
+                            Placeholder="https://localhost:5001"
+                            Immediate="true" />
+                    </MudItem>
+
+                    <MudItem xs="12" md="3">
+                        <MudTextField @bind-Value="clientId" Label="Client ID" Immediate="true" />
+                    </MudItem>
+
+                    <MudItem xs="12" md="3">
+                        <MudTextField
+                            @bind-Value="clientPass"
+                            Label="Client Pass (x-client-pass)"
+                            InputType="InputType.Password"
+                            Immediate="true" />
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudDivider Class="my-2" />
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.subtitle1">Message</MudText>
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="from" Label="From" Placeholder="from@example.com" Immediate="true" />
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="to" Label="To (comma / semicolon separated)" Placeholder="to@example.com" Immediate="true" />
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="cc" Label="CC (comma / semicolon separated)" Immediate="true" />
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="bcc" Label="BCC (comma / semicolon separated)" Immediate="true" />
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="subject" Label="Subject" Immediate="true" />
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudTextField
+                            @bind-Value="body"
+                            Label="Body"
+                            Lines="6"
+                            Immediate="true" />
+                    </MudItem>
+
+                    <MudItem xs="12" md="4">
+                        <MudSwitch
+                            T="bool"
+                            @bind-Value="isBodyHtml"
+                            Color="Color.Primary" />
+                        <MudText Typo="Typo.caption">HTML body</MudText>
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudDivider Class="my-2" />
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.subtitle1">Attachments</MudText>
+                        <MudText Typo="Typo.caption" Class="mb-2">Select one or more files to attach. For remote services, files are uploaded and converted to attachment tokens.</MudText>
+
+                        <InputFile OnChange="this.OnAttachmentsSelected" multiple />
+
+                        @if (attachmentNames.Count > 0)
+                        {
+                            <MudList T="string" Dense="true" Class="mt-2">
+                                @foreach (var name in attachmentNames)
+                                {
+                                    <MudListItem T="string">@name</MudListItem>
+                                }
+                            </MudList>
+                        }
+                    </MudItem>
+
+                    <MudItem xs="12" Class="mt-2">
+                        <MudButton
+                            Variant="Variant.Filled"
+                            Color="Color.Primary"
+                            OnClick="this.SendStandardAsync"
+                            Disabled="@busy">
+                            Send
+                        </MudButton>
+
+                        <MudButton
+                            Variant="Variant.Outlined"
+                            Color="Color.Default"
+                            OnClick="this.ClearStandard"
+                            Disabled="@busy"
+                            Class="ms-2">
+                            Clear
+                        </MudButton>
+                    </MudItem>
+
+                    @if (busy)
+                    {
+                        <MudItem xs="12" Class="mt-2">
+                            <MudProgressLinear Indeterminate Color="Color.Primary" />
+                        </MudItem>
+                    }
+                </MudGrid>
+            </MudPaper>
+        </MudTabPanel>
+
+        <MudTabPanel Text="Merge mail">
+            <MudPaper Class="pa-3" Elevation="1">
+                <MudGrid>
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.subtitle1">Merge batch</MudText>
+                    </MudItem>
+
+                    <MudItem xs="12" md="4">
+                        <MudTextField
+                            @bind-Value="mergeId"
+                            Label="Merge Id (optional)"
+                            HelperText="Leave blank to start a new merge; provide an existing id to append a batch."
+                            Immediate="true" />
+                    </MudItem>
+
+                    <MudItem xs="12" md="4">
+                        <MudSelect T="TemplateEngine" Label="Merge engine" @bind-Value="MergeEngine">
+                            <MudSelectItem T="TemplateEngine" Value="@TemplateEngine.Liquid">Fluid.Core (Liquid)</MudSelectItem>
+                            <MudSelectItem T="TemplateEngine" Value="@TemplateEngine.Handlebars">Handlebars.Net</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12" md="4">
+                        <MudSelect T="MergeTemplateKind" Label="Template type" @bind-Value="mergeTemplateKind">
+                            <MudSelectItem T="MergeTemplateKind" Value="@MergeTemplateKind.SubjectBody">Subject + Body template</MudSelectItem>
+                            <MudSelectItem T="MergeTemplateKind" Value="@MergeTemplateKind.HtmlBody">HTML body template</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudDivider Class="my-2" />
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudStack
+                            Row="true"
+                            Spacing="1"
+                            AlignItems="AlignItems.Center">
+                            <MudText Typo="Typo.subtitle1">Template</MudText>
+
+                            @if (mergeTemplateConversionWarnings.Count > 0)
+                            {
+                                <MudMenu
+                                    Color="Color.Warning"
+                                    Dense="true"
+                                    Icon="@Icons.Material.Filled.WarningAmber">
+                                    @foreach (var warning in mergeTemplateConversionWarnings)
+                                    {
+                                        <MudMenuItem Disabled="true">@warning</MudMenuItem>
+                                    }
+                                </MudMenu>
+                            }
+                        </MudStack>
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="mergeTemplateSubject" Label="Template subject" Immediate="true" />
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="mergeTemplateFrom" Label="Template from" Immediate="true" />
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudTextField
+                            @bind-Value="mergeTemplateBody"
+                            Label="Template body"
+                            Lines="6"
+                            Immediate="true" />
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudDivider Class="my-2" />
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.subtitle1">Merge data</MudText>
+                        <MudText Typo="Typo.caption" Class="mb-2">Provide JSON lines (one JSON object per line). You can edit directly or upload a .jsonl file.</MudText>
+
+                        <MudTextField
+                            @bind-Value="mergeJsonLines"
+                            Label="JSON Lines"
+                            Lines="8"
+                            Immediate="true" />
+
+                        <div class="mt-2">
+                            <InputFile OnChange="this.OnMergeFileSelected" accept=".jsonl,.txt,.json" />
+                        </div>
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudDivider Class="my-2" />
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.subtitle1">Attachments</MudText>
+                        <MudText Typo="Typo.caption" Class="mb-2">Attachments are part of the template and are only applied when creating a new merge. For remote services, files are uploaded and converted to attachment tokens.</MudText>
+
+                        <InputFile OnChange="this.OnMergeAttachmentsSelected" multiple />
+
+                        @if (mergeAttachmentNames.Count > 0)
+                        {
+                            <MudList T="string" Dense="true" Class="mt-2">
+                                @foreach (var name in mergeAttachmentNames)
+                                {
+                                    <MudListItem T="string">@name</MudListItem>
+                                }
+                            </MudList>
+                        }
+                    </MudItem>
+
+                    <MudItem xs="12" Class="mt-2">
+                        <MudButton
+                            Variant="Variant.Filled"
+                            Color="Color.Primary"
+                            OnClick="this.SendMergeAsync"
+                            Disabled="@busy">
+                            Queue merge batch
+                        </MudButton>
+
+                        <MudButton
+                            Variant="Variant.Outlined"
+                            Color="Color.Default"
+                            OnClick="this.ClearMerge"
+                            Disabled="@busy"
+                            Class="ms-2">
+                            Clear
+                        </MudButton>
+                    </MudItem>
+
+                    @if (busy)
+                    {
+                        <MudItem xs="12" Class="mt-2">
+                            <MudProgressLinear Indeterminate Color="Color.Primary" />
+                        </MudItem>
+                    }
+                </MudGrid>
+            </MudPaper>
+        </MudTabPanel>
+    </MudTabs>
+</MudContainer>

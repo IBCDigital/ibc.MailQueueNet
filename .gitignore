@@ -8,8 +8,45 @@
 *.sln.docstates
 *.vcxproj.filters
 
+#Docker
+.env
+**/.env
+!**/.env.example
+
+# Local application configuration and secrets
+**/appsettings.Development.json
+**/appsettings.Local.json
+**/appsettings.*.local.json
+MailForge/appsettings.json
+MailFunk/appsettings.json
+Tests/appsettings.json
+
+# Local certificates and private keys
+*.pfx
+*.p12
+*.key
+*.pem
+Certs/
+**/Certs/*.pfx
+**/Certs/*.p12
+**/Certs/*.key
+**/Certs/*.pem
+**/Certs/*localhost*.cer
+
+# Local runtime/test mail output
+mail/
+
+# Local debug output
+debug.txt
+running output.txt
+**/[Ll]ogs/
+
+# Local troubleshooting artefacts
+dev-resources/*.har
+
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
+launchSetting.json
 
 # Build results
 [Dd]ebug/
@@ -199,6 +236,12 @@ ClientBin/
 *.publishsettings
 node_modules/
 orleans.codegen.cs
+
+# Documentation build output
+docfx/api/*.yml
+docfx/api/toc.yml
+docs-site/static/api/
+docs-site/.previewroot/
 
 # Since there are multiple workflows, uncomment next line to ignore bower_components
 # (https://github.com/github/gitignore/pull/1529#issuecomment-104372622)

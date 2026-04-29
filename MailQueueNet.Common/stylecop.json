@@ -1,0 +1,18 @@
+﻿{
+  // ACTION REQUIRED: This file was automatically added to your project, but it
+  // will not take effect until additional steps are taken to enable it. See the
+  // following page for additional information:
+  //
+  // https://github.com/DotNetAnalyzers/StyleCopAnalyzers/blob/master/documentation/EnableConfiguration.md
+
+  "$schema": "https://raw.githubusercontent.com/DotNetAnalyzers/StyleCopAnalyzers/master/StyleCop.Analyzers/StyleCop.Analyzers/Settings/stylecop.schema.json",
+  "settings": {
+    "documentationRules": {
+      "companyName": "IBC Digital",
+      "variables": {
+        "year": "2025"
+      },
+      "copyrightText": "  Copyright (c) {companyName}. All rights reserved.\n\n Derived from “MailQueueNet” by Daniel Cohen Gindi\n (https://github.com/danielgindi/MailQueueNet).\n\n Original portions:\n   © 2014 Daniel Cohen Gindi (danielgindi@gmail.com)\n   Licensed under the MIT Licence.\n Modifications and additions:\n   © {year} IBC Digital Pty Ltd\n   Distributed under the same MIT Licence.\n\n The above notice and this permission notice shall be included in\n all copies or substantial portions of this file."      
+    }
+  }
+}

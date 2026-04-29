@@ -1,0 +1,73 @@
+@* Renders a preview of a queued/failed .mail file, including metadata and message details *@
+
+<MudPaper Class="pa-4 mt-4" Elevation="1">
+    @if (Entry is null || string.IsNullOrWhiteSpace(Entry.Name))
+    {
+        <MudText>Select a message to preview</MudText>
+    }
+    else if (LoadError is not null)
+    {
+        <MudAlert Severity="Severity.Error">@LoadError</MudAlert>
+    }
+    else if (Message is null)
+    {
+        <MudProgressLinear Indeterminate Color="Color.Primary" />
+    }
+    else
+    {
+        <div class="d-flex justify-space-between align-center">
+            <div>
+                <MudText Typo="Typo.h6">@Message.Message?.Subject</MudText>
+                <MudText Typo="Typo.caption">@(string.IsNullOrWhiteSpace(Entry.FullPath) ? Entry.Name : Entry.FullPath)</MudText>
+            </div>
+            @if (!IsReadOnlyPreview)
+            {
+                <div class="d-flex gap-2">
+                    <MudButton Color="Color.Error" Variant="Variant.Filled" Disabled="@busy" OnClick="ShowDeleteConfirm">Delete</MudButton>
+                    @if (CanRetry)
+                    {
+                        <MudButton Color="Color.Primary" Variant="Variant.Outlined" Disabled="@busy" OnClick="RetryAsync">Retry</MudButton>
+                    }
+                </div>
+            }
+        </div>
+        <MudDivider Class="my-2" />
+
+        <MudGrid>
+            <MudItem xs="12" md="6">
+                <MudList T="string" Dense="true">
+                    <MudListItem T="string">From: @Addr(Message.Message?.From)</MudListItem>
+                    <MudListItem T="string">To: @JoinAddrs(Message.Message?.To!)</MudListItem>
+                    <MudListItem T="string">CC: @JoinAddrs(Message.Message?.Cc!)</MudListItem>
+                    <MudListItem T="string">Bcc: @JoinAddrs(Message.Message?.Bcc!)</MudListItem>
+                    <MudListItem T="string">Reply-To: @JoinAddrs(Message.Message?.ReplyTo!)</MudListItem>
+                    <MudListItem T="string">Priority: @Message.Message?.Priority</MudListItem>
+                    <MudListItem T="string">Client ID: @(Entry.ClientId ?? "-")</MudListItem>
+                    <MudListItem T="string">Attempts: @Entry.AttemptCount</MudListItem>
+                    <MudListItem T="string">Created: @Entry.CreatedUtc:u</MudListItem>
+                    <MudListItem T="string">Modified: @Entry.ModifiedUtc:u</MudListItem>
+                </MudList>
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudList T="string" Dense="true">
+                    <MudListItem T="string">Service: @ServiceName</MudListItem>
+                    @if (Message.Settings?.Smtp is not null)
+                    {
+                        <MudListItem T="string">Host: @Message.Settings.Smtp.Host</MudListItem>
+                        <MudListItem T="string">Port: @Message.Settings.Smtp.Port</MudListItem>
+                        <MudListItem T="string">SSL: @(Message.Settings.Smtp.RequiresSsl ? "Yes" : "No")</MudListItem>
+                        <MudListItem T="string">Auth: @(Message.Settings.Smtp.RequiresAuthentication ? "Yes" : "No")</MudListItem>
+                    }
+                    @if (Message.Settings?.Mailgun is not null)
+                    {
+                        <MudListItem T="string">Domain: @Message.Settings.Mailgun.Domain</MudListItem>
+                    }
+                </MudList>
+            </MudItem>
+        </MudGrid>
+
+        <MudDivider Class="my-2" />
+        <MudText Typo="Typo.subtitle2">Body</MudText>
+        <MudPaper Class="pa-2 mt-1" Elevation="0" Style="max-height:300px;overflow:auto;white-space:pre-wrap;">@Message.Message?.Body</MudPaper>
+    }
+</MudPaper>

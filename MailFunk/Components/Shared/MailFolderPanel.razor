@@ -1,0 +1,61 @@
+@using MailFunk.Models
+
+<MudPaper Class="pa-4" Elevation="1">
+    <div class="d-flex justify-space-between align-center">
+        <div>
+            <MudText Typo="Typo.h6">@this.Title</MudText>
+            <MudText Class="mb-2">@this.FolderPath</MudText>
+        </div>
+        @if (EnableBulkActions)
+        {
+            <div class="d-flex gap-2">
+                @if (AllowRetry)
+                {
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" Disabled="@(!AnySelected)" OnClick="RetrySelectedAsync">Retry Selected</MudButton>
+                }
+                <MudButton Variant="Variant.Filled" Color="Color.Error" Disabled="@(!AnySelected)" OnClick="DeleteSelectedAsync">Delete Selected</MudButton>
+            </div>
+        }
+    </div>
+    <MudDivider Class="my-2" />
+
+    @if (this.Files is null || this.Files.Count == 0)
+    {
+        <MudText>No files.</MudText>
+    }
+    else
+    {
+        @if (EnableBulkActions)
+        {
+            <MudCheckBox @bind-Value="SelectAll" Label="Select All" T="bool" Class="mb-2" />
+        }
+        <MudList T="MailFileEntry" Dense="true" SelectedValue="@this.selected" SelectedValueChanged="this.OnSelectionChangedAsync">
+            @foreach (var f in this.Files)
+            {
+                var key = this.GetSelectionKey(f);
+                var isSelected = selectedSet.Contains(key);
+                <MudListItem T="MailFileEntry" Value="@f">
+                    <div class="d-flex justify-space-between align-start w-100">
+                        <div class="d-flex align-start gap-2">
+                            @if (EnableBulkActions)
+                            {
+                                <MudCheckBox Value="@isSelected" T="bool" Style="margin-top:4px" ValueChanged="checkedVal => ToggleSelection(f, checkedVal)" />
+                            }
+                            <div>
+                                <MudText Typo="Typo.subtitle2">@f.Name</MudText>
+                                <MudText Typo="Typo.caption">Created: @f.CreatedUtc:u | Modified: @f.ModifiedUtc:u</MudText>
+                                <MudText Typo="Typo.caption">Client: @(string.IsNullOrEmpty(f.ClientId) ? "-" : f.ClientId) | Attempts: @f.AttemptCount</MudText>
+                            </div>
+                        </div>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">@FormatSize(f.SizeBytes)</MudText>
+                    </div>
+                </MudListItem>
+            }
+        </MudList>
+    }
+
+    @if (this.TotalCount > (this.Files?.Count ?? 0))
+    {
+        <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="this.OnLoadMore">Show more…</MudButton>
+    }
+</MudPaper>

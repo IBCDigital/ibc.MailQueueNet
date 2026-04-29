@@ -1,0 +1,71 @@
+@page "/allowed-test-recipients"
+
+<PageTitle>Allowed Test Recipients</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Medium">
+    <MudText Typo="Typo.h5" Class="mb-2">Allowed Test Recipients</MudText>
+
+    <MudAlert Severity="Severity.Info" Class="mb-3">
+        In staging, all mail goes to Mailpit by default. Enter a client id to view or manage that client's allow-list for real SMTP delivery. MailFunk uses admin credentials, so it can manage any client list, but the server API does not currently return all client ids in one view.
+    </MudAlert>
+
+    @if (!string.IsNullOrWhiteSpace(this.error))
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-2">@this.error</MudAlert>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(this.status))
+    {
+        <MudAlert Severity="Severity.Success" Class="mb-2">@this.status</MudAlert>
+    }
+
+    @if (!this.isStaging)
+    {
+        <MudAlert Severity="Severity.Warning">This feature is only available in Staging.</MudAlert>
+    }
+    else
+    {
+        <MudPaper Class="pa-3 mb-3" Elevation="1">
+            <MudStack Spacing="2">
+                <MudTextField @bind-Value="this.clientId" Label="Client ID" Immediate="true" HelperText="MailFunk can manage any client's list using admin credentials." />
+                <MudTextField @bind-Value="this.newEmailAddress" Label="Email address" Immediate="true" />
+                <MudStack Row="true" Spacing="2">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="this.AddAsync" Disabled="@this.busy">Add</MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="this.RefreshAsync" Disabled="@this.busy">Refresh</MudButton>
+                </MudStack>
+            </MudStack>
+        </MudPaper>
+
+        <MudPaper Class="pa-3" Elevation="1">
+            @if (this.busy && this.items.Count == 0)
+            {
+                <MudProgressLinear Indeterminate Color="Color.Primary" />
+            }
+            else if (this.items.Count == 0)
+            {
+                @if (string.IsNullOrWhiteSpace(this.clientId))
+                {
+                    <MudText Typo="Typo.body2">Enter a client id and select Refresh to view allow-listed recipients.</MudText>
+                }
+                else
+                {
+                    <MudText Typo="Typo.body2">No allow-listed recipients configured for this client.</MudText>
+                }
+            }
+            else
+            {
+                <MudList T="string" Dense="true">
+                    @foreach (var item in this.items)
+                    {
+                        <MudListItem T="string">
+                            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="w-100">
+                                <MudText Typo="Typo.body2">@item</MudText>
+                                <MudButton Variant="Variant.Text" Color="Color.Error" OnClick="() => this.DeleteAsync(item)" Disabled="@this.busy">Delete</MudButton>
+                            </MudStack>
+                        </MudListItem>
+                    }
+                </MudList>
+            }
+        </MudPaper>
+    }
+</MudContainer>

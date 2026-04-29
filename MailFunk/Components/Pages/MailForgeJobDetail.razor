@@ -1,0 +1,103 @@
+@page "/mailforge/{MergeId}"
+@using MailForge.Grpc
+@using MailQueueNet.Grpc
+
+<PageTitle>MailForge - Merge</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.False">
+    <div class="d-flex justify-space-between align-center mb-4 flex-wrap gap-4">
+        <div>
+            <MudText Typo="Typo.h5">MailForge</MudText>
+            <MudText Typo="Typo.subtitle2">Merge: @this.MergeId</MudText>
+        </div>
+        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="this.RefreshAsync" Disabled="@this.refreshing">Refresh</MudButton>
+
+            <MudButton Variant="Variant.Outlined" Color="Color.Warning" OnClick="this.PauseAsync" Disabled="@this.refreshing">Pause</MudButton>
+
+            <MudButton Variant="Variant.Outlined" Color="Color.Success" OnClick="this.ResumeAsync" Disabled="@this.refreshing">Resume</MudButton>
+
+            <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="this.DeleteAsync" Disabled="@this.refreshing">Delete</MudButton>
+        </MudStack>
+    </div>
+
+    @if (this.loading)
+    {
+        <MudProgressCircular Indeterminate="true" />
+    }
+    else if (this.detail == null)
+    {
+        <MudAlert Severity="Severity.Warning">No details available for this merge.</MudAlert>
+    }
+    else
+    {
+        <MudPaper Class="pa-3 mb-4" Elevation="1">
+            <MudGrid>
+                <MudItem xs="12" md="3"><MudText Typo="Typo.body2">Status</MudText><MudText Typo="Typo.h6">@this.detail.Summary.Status</MudText></MudItem>
+                <MudItem xs="12" md="3"><MudText Typo="Typo.body2">Client</MudText><MudText Typo="Typo.h6">@this.detail.Summary.ClientId</MudText></MudItem>
+                <MudItem xs="12" md="3"><MudText Typo="Typo.body2">Progress</MudText><MudText Typo="Typo.h6">@this.detail.PercentComplete%</MudText></MudItem>
+                <MudItem xs="12" md="3"><MudText Typo="Typo.body2">Batches</MudText><MudText Typo="Typo.h6">@this.detail.Summary.BatchCount</MudText></MudItem>
+            </MudGrid>
+        </MudPaper>
+
+        <MudPaper Class="pa-3 mb-4" Elevation="1">
+            <MudText Typo="Typo.subtitle1">Template</MudText>
+            <MudText Typo="Typo.body2"><b>Subject:</b> @this.detail.Template?.Message?.Subject</MudText>
+            <MudText Typo="Typo.body2" Class="mt-2"><b>Body:</b></MudText>
+            <MudText Typo="Typo.body2" Style="white-space:pre-wrap;">@this.detail.Template?.Message?.Body</MudText>
+        </MudPaper>
+
+        <MudPaper Class="pa-3" Elevation="1">
+            <MudText Typo="Typo.subtitle1">Batches</MudText>
+            <MudTable Items="this.detail.Batches" Dense="true" Hover="true">
+                <HeaderContent>
+                    <MudTh align="right">Batch</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh align="right">Total</MudTh>
+                    <MudTh align="right">Completed</MudTh>
+                    <MudTh align="right">Failed</MudTh>
+                    <MudTh>Updated (UTC)</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Batch" Align="Right">@context.BatchId</MudTd>
+                    <MudTd DataLabel="Status">@context.Status</MudTd>
+                    <MudTd DataLabel="Total" Align="Right">@context.TotalRows</MudTd>
+                    <MudTd DataLabel="Completed" Align="Right">@context.CompletedRows</MudTd>
+                    <MudTd DataLabel="Failed" Align="Right">@context.FailedRows</MudTd>
+                    <MudTd DataLabel="Updated (UTC)">@context.UpdatedUtc</MudTd>
+                    <MudTd>
+                        <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="@(() => this.OpenBatchPreviewAsync(context.BatchId))">Preview</MudButton>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        </MudPaper>
+
+        <MudDialog @bind-Visible="this.previewOpen" MaxWidth="MaxWidth.Medium" FullWidth="true">
+            <DialogContent>
+                <MudText Typo="Typo.h6">Batch preview: @this.previewBatchId</MudText>
+
+                @if (this.previewLoading)
+                {
+                    <MudProgressCircular Indeterminate="true" />
+                }
+                else if (this.previewReply == null || !this.previewReply.Success)
+                {
+                    <MudAlert Severity="Severity.Warning">@this.previewError</MudAlert>
+                }
+                else
+                {
+                    <MudText Typo="Typo.caption">Showing @this.previewReply.Rows.Count of @this.previewReply.TotalRows row(s).</MudText>
+                    <MudText Typo="Typo.body2" Style="white-space:pre-wrap; max-height: 400px; overflow:auto;" Class="mt-2">@string.Join("\n", this.previewReply.Rows)</MudText>
+                }
+            </DialogContent>
+            <DialogActions>
+                <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="this.CloseBatchPreview">Close</MudButton>
+            </DialogActions>
+        </MudDialog>
+
+        @if (!string.IsNullOrWhiteSpace(this.error))
+        {
+            <MudAlert Severity="Severity.Error" Class="mt-4">@this.error</MudAlert>
+        }
+    }
+</MudContainer>

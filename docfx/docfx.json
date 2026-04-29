@@ -1,0 +1,50 @@
+{
+  "metadata": [
+    {
+      "src": [
+        {
+          "src": "..",
+          "files": [
+            "MailQueueNet.Common/MailQueueNet.Common.csproj",
+            "MailQueueNet.Core/MailQueueNet.Core.csproj",
+            "MailQueueNet.Service/MailQueueNet.Service.csproj",
+            "MailForge/MailForge.csproj"
+          ]
+        }
+      ],
+      "dest": "api",
+      "disableGitFeatures": false,
+      "disableDefaultFilter": false
+    }
+  ],
+  "build": {
+    "content": [
+      {
+        "files": [
+          "api/**.yml",
+          "api/index.md"
+        ]
+      }
+    ],
+    "resource": [
+      {
+        "files": [
+          "api/**.png",
+          "api/**.jpg",
+          "api/**.svg"
+        ]
+      }
+    ],
+    "dest": "../docs-site/static/api",
+    "template": [
+      "default",
+      "modern"
+    ],
+    "globalMetadata": {
+      "_appTitle": "MailQueueNet API Reference",
+      "_appName": "MailQueueNet",
+      "_disableContribution": true,
+      "_disableBreadcrumb": false
+    }
+  }
+}

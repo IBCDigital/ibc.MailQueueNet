@@ -9,19 +9,91 @@ package MailQueue;
 service MailGrpcService {
   rpc QueueMail (MailMessage) returns (MailMessageReply);
   rpc QueueMailWithSettings (MailMessageWithSettings) returns (MailMessageReply);
+
+  // Mail merge queueing. These calls append to, or create, a mail-merge batch
+  // identified by merge_id so callers can build merge directives incrementally.
+  rpc QueueMailMerge (QueueMailMergeRequest) returns (QueueMailMergeReply);
+  rpc QueueMailMergeWithSettings (QueueMailMergeWithSettingsRequest) returns (QueueMailMergeReply);
+
+  // MailForge acknowledges completion of a queued merge batch so the queue
+  // service can delete the corresponding JSONL file.
+  rpc AckMailMergeBatch (AckMailMergeBatchRequest) returns (AckMailMergeBatchReply);
+
+  // Attachment streaming upload. This allows clients to upload attachment bytes
+  // once and reference them from queued mails (including merge mails) without
+  // requiring shared storage.
+  rpc UploadAttachment (stream UploadAttachmentRequest) returns (UploadAttachmentReply);
+
+  // Attachment administration.
+  // These calls are intended for diagnostics and operational workflows.
+  rpc GetAttachmentInfo (GetAttachmentInfoRequest) returns (GetAttachmentInfoReply);
+  rpc DeleteAttachment (DeleteAttachmentRequest) returns (DeleteAttachmentReply);
+
+  // Attachment diagnostics: download/preview and raw manifest access (admin only).
+  rpc DownloadAttachment (DownloadAttachmentRequest) returns (stream DownloadAttachmentReply);
+  rpc GetAttachmentManifest (GetAttachmentManifestRequest) returns (GetAttachmentManifestReply);
+
+  // Attachment listing/search (admin only).
+  rpc ListAttachments (ListAttachmentsRequest) returns (ListAttachmentsReply);
+
+  // Ops-focused attachment endpoints (admin only).
+  // These map directly to common operational UI actions.
+  rpc GetAttachmentStats (GetAttachmentStatsRequest) returns (GetAttachmentStatsReply);
+  rpc PreviewOrphans (PreviewOrphansRequest) returns (PreviewOrphansReply);
+  rpc PreviewLargeAttachments (PreviewLargeAttachmentsRequest) returns (PreviewLargeAttachmentsReply);
+
+  // Queues multiple messages in a single request.
+  rpc QueueMailBulk (QueueMailBulkRequest) returns (QueueMailBulkReply);
+
   rpc SetMailSettings (SetMailSettingsMessage) returns (SetMailSettingsReply);
   rpc GetMailSettings (GetMailSettingsMessage) returns (GetMailSettingsReply);
   rpc SetSettings (SetSettingsMessage) returns (SetSettingsReply);
   rpc GetSettings (GetSettingsMessage) returns (GetSettingsReply);
+  rpc GetServiceConfig (GetServiceConfigRequest) returns (GetServiceConfigReply);
+  rpc DeleteMails (ModifyFilesRequest) returns (BulkActionReply);
+  rpc RetryFailedMails (ModifyFilesRequest) returns (BulkActionReply);
+  // Processing control
+  rpc PauseProcessing (PauseProcessingRequest) returns (PauseProcessingReply);
+  rpc ResumeProcessing (ResumeProcessingRequest) returns (ResumeProcessingReply);
+  rpc GetProcessingStatus (GetProcessingStatusRequest) returns (GetProcessingStatusReply);
+  // Logs
+  rpc ListServerLogFiles (ListLogsRequest) returns (ListLogsReply);
+  rpc ReadServerLog (ReadLogRequest) returns (ReadLogReply);
+  rpc StreamServerLog (ReadLogRequest) returns (stream ReadLogReply);
+  // Usage statistics
+  rpc GetUsageStats (UsageStatsRequest) returns (UsageStatsReply);
+  // Queue folder enumeration (admin only)
+  rpc GetFolderSummary (GetFolderSummaryRequest) returns (GetFolderSummaryReply);
+  rpc ListMailFiles (ListMailFilesRequest) returns (ListMailFilesReply);
+  rpc ReadMailFile (ReadMailFileRequest) returns (ReadMailFileReply);
+
+  // Mail merge admin views.
+  rpc ListMailMerges (ListMailMergesRequest) returns (ListMailMergesReply);
+  rpc GetMailMergeSummary (GetMailMergeSummaryRequest) returns (GetMailMergeSummaryReply);
+
+  // Dispatcher state admin views.
+  rpc ListMergeDispatchState (ListMergeDispatchStateRequest) returns (ListMergeDispatchStateReply);
+
+  // Staging-only allow-list management for real recipient delivery.
+  // These endpoints use client shared-secret authentication and operate only on
+  // the authenticated client's own allow-list.
+  rpc ListAllowedTestRecipients (ListAllowedTestRecipientsRequest) returns (ListAllowedTestRecipientsReply);
+  rpc AddAllowedTestRecipient (AddAllowedTestRecipientRequest) returns (AddAllowedTestRecipientReply);
+  rpc DeleteAllowedTestRecipient (DeleteAllowedTestRecipientRequest) returns (DeleteAllowedTestRecipientReply);
+
+  // Attachment cleanup workflow (admin only): list/delete by query with dry-run support.
+  rpc DeleteAttachmentsByQuery (DeleteAttachmentsByQueryRequest) returns (DeleteAttachmentsByQueryReply);
 }
 
 message Settings {
   google.protobuf.StringValue TestV = 6;
   google.protobuf.StringValue queueFolder = 1;
   google.protobuf.StringValue failedFolder = 2;
+  google.protobuf.StringValue mailMergeQueueFolder = 8;
   float secondsUntilFolderRefresh = 3;
   int32 maximumConcurrentWorkers = 4;
   int32 maximumFailureRetries = 5;
+  int32 maximumPauseMinutes = 7; // safeguard for pause duration
 }
 
 message SmtpMailSettings {
@@ -31,17 +103,13 @@ message SmtpMailSettings {
   bool requiresAuthentication = 4;
   google.protobuf.StringValue username = 5;
   google.protobuf.StringValue password = 6;
-
-  // The number of milliseconds to wait before the request times out. The default value is 100,000 milliseconds (100 seconds).
-  int32 connectionTimeout = 7;
+  int32 connectionTimeout = 7; // ms
 }
 
 message MailgunMailSettings {
   google.protobuf.StringValue domain = 1;
   google.protobuf.StringValue apiKey = 2;
-
-  // The number of milliseconds to wait before the request times out. The default value is 100,000 milliseconds (100 seconds).
-  int32 connectionTimeout = 7;
+  int32 connectionTimeout = 7; // ms
 }
 
 message MailSettings {
@@ -68,6 +136,15 @@ message MailMessage {
   google.protobuf.StringValue deliveryNotificationOptions = 14;
   repeated Attachment attachments = 15;
   repeated Header headers = 16;
+
+  // Optional correlation identifiers used by merge processing.
+  // These are stamped by MailForge on outgoing individual mails.
+  google.protobuf.StringValue mergeId = 17;
+  google.protobuf.StringValue batchId = 18;
+
+  // Attachment tokens previously uploaded to the queue service.
+  // These can be referenced by both normal and merge mails.
+  repeated AttachmentTokenRef attachment_tokens = 19;
 }
 
 message MailMessageWithSettings {
@@ -107,26 +184,610 @@ message ContentDisposition {
   map<string,string> params = 8;
 }
 
-message MailMessageReply {
-  bool success = 1;
+message AttachmentTokenRef {
+  // Opaque token returned by UploadAttachment.
+  string token = 1;
+
+  // Optional attachment name information used by downstream mail creation.
+  string file_name = 2;
+  string content_type = 3;
+  string content_id = 4;
+
+  // Indicates whether the attachment should be treated as inline.
+  bool inline = 5;
 }
 
-message SetMailSettingsMessage {
-  MailSettings settings = 1;
+message UploadAttachmentRequest {
+  oneof payload {
+    UploadAttachmentStart start = 1;
+    bytes chunk = 2;
+  }
 }
+
+message UploadAttachmentStart {
+  // Optional caller supplied token enabling idempotent uploads.
+  // When empty, the server will allocate a token.
+  string token = 1;
+
+  // Original attachment metadata.
+  string file_name = 2;
+  string content_type = 3;
+
+  // File size in bytes if known.
+  int64 length = 4;
+
+  // SHA-256 of the full file content, base64 encoded.
+  string sha256_base64 = 5;
+}
+
+message UploadAttachmentReply {
+  bool success = 1;
+  string token = 2;
+  int64 received_bytes = 3;
+  string message = 4;
+}
+
+message MailMessageReply { bool success = 1; }
+
+message SetMailSettingsMessage { MailSettings settings = 1; }
 message SetMailSettingsReply {}
 
 message GetMailSettingsMessage {}
-message GetMailSettingsReply {
-  MailSettings settings = 1;
-}
+message GetMailSettingsReply { MailSettings settings = 1; }
 
-message SetSettingsMessage {
-  Settings settings = 1;
-}
+message SetSettingsMessage { Settings settings = 1; }
 message SetSettingsReply {}
 
 message GetSettingsMessage {}
-message GetSettingsReply {
-  Settings settings = 1;
+message GetSettingsReply { Settings settings = 1; }
+
+message GetServiceConfigRequest {}
+message GetServiceConfigReply {
+  string queue_folder = 1;
+  string undelivered_folder = 2;
+  string failed_folder = 3;
+  string mail_merge_queue_folder = 4;
+}
+
+message ListAllowedTestRecipientsRequest {
+  string client_id = 1;
+}
+
+message ListAllowedTestRecipientsReply {
+  repeated string email_addresses = 1;
+}
+
+message AddAllowedTestRecipientRequest {
+  string email_address = 1;
+  string client_id = 2;
+}
+
+message AddAllowedTestRecipientReply {
+  bool success = 1;
+  string message = 2;
+}
+
+message DeleteAllowedTestRecipientRequest {
+  string email_address = 1;
+  string client_id = 2;
+}
+
+message DeleteAllowedTestRecipientReply {
+  bool success = 1;
+  string message = 2;
+}
+
+// Bulk file operation request (admin only)
+message ModifyFilesRequest {
+  // Files to operate on.
+  //
+  // For backwards compatibility, entries may be absolute paths.
+  //
+  // New clients should prefer <see cref="file_refs"/> so callers do not need to
+  // send raw filesystem paths and also do not need to provide a separate
+  // <see cref="folder"/> value for the whole request.
+  //
+  // When <see cref="folder"/> is specified, entries may be provided as file
+  // names only (no directory separators) and will be resolved on the server
+  // relative to the configured folder.
+  //
+  // When <see cref="folder"/> is unspecified, entries may also be provided as
+  // file names only. In that case the server will attempt to locate the file in
+  // one of the configured mail folders (queue, failed, mail merge queue). If
+  // the name is ambiguous (exists in more than one folder), the entry is
+  // skipped.
+  repeated string files = 1 [deprecated=true];
+
+  // Optional folder hint used to resolve file names in <see cref="files"/>.
+  // When unspecified, callers should pass absolute paths.
+  MailFolderKind folder = 2;
+
+  // Preferred file reference list.
+  //
+  // Each entry carries both the folder kind and file name so callers do not
+  // need to pass raw filesystem paths and do not need to pass <see
+  // cref="folder"/> for the request.
+  repeated MailFileRef file_refs = 3;
+}
+
+// Bulk file operation reply
+message BulkActionReply {
+  int32 total = 1;
+  int32 succeeded = 2;
+  int32 failed = 3;
+}
+
+// Processing control messages
+message PauseProcessingRequest { int32 requested_minutes = 1; }
+message PauseProcessingReply { bool success = 1; int32 effective_minutes = 2; string auto_resume_utc = 3; }
+message ResumeProcessingRequest {}
+message ResumeProcessingReply { bool success = 1; }
+message GetProcessingStatusRequest {}
+message GetProcessingStatusReply { bool is_paused = 1; string paused_by = 2; string paused_at_utc = 3; string auto_resume_utc = 4; }
+
+// Logs
+message ListLogsRequest {}
+message LogFileInfo { string name = 1; int64 size = 2; string modified_utc = 3; }
+message ListLogsReply { string base_folder = 1; repeated LogFileInfo files = 2; }
+message ReadLogRequest { string name = 1; int32 tail_bytes = 2; }
+message ReadLogReply { string name = 1; string content = 2; int64 size = 3; string modified_utc = 4; }
+
+// Usage statistics
+message UsageStatsRequest { int64 from_utc_unix_ms = 1; int64 to_utc_unix_ms = 2; }
+message ClientStats { string client_id = 1; int64 emails = 2; int64 failures = 3; }
+message UsageStatsReply {
+  int64 total_emails = 1; // queued/received
+  int64 total_failures = 2;
+  string most_active_client_id = 3;
+  int32 distinct_clients = 4;
+  string top_failure_client_id = 5;
+  int64 sent_in_period = 6;
+  int64 failed_in_period = 7;
+  repeated ClientStats clients = 8;
+}
+
+// Folder enumeration
+message GetFolderSummaryRequest {}
+message GetFolderSummaryReply {
+  string queue_folder = 1;
+  string failed_folder = 2;
+  string mail_merge_queue_folder = 5;
+  int32 queue_count = 3;
+  int32 failed_count = 4;
+  int32 mail_merge_queue_count = 6;
+}
+
+enum MailFolderKind {
+  MAIL_FOLDER_KIND_UNSPECIFIED = 0;
+  MAIL_FOLDER_KIND_QUEUE = 1;
+  MAIL_FOLDER_KIND_FAILED = 2;
+  MAIL_FOLDER_KIND_MAIL_MERGE_QUEUE = 3;
+}
+
+// Identifies a mail file without requiring raw filesystem paths.
+message MailFileRef {
+  // Folder that contains the file.
+  MailFolderKind folder = 1;
+
+  // File name only (no directory separators).
+  string name = 2;
+}
+
+message ListMailFilesRequest {
+  MailFolderKind folder = 1;
+  int32 skip = 2;
+  int32 take = 3;
+}
+
+message MailFileInfo {
+  string name = 1;
+  string full_path = 2 [deprecated=true];
+  int64 size = 3;
+  string created_utc = 4;
+  string modified_utc = 5;
+  string client_id = 6;
+  int32 attempt_count = 7;
+
+  // Preferred reference to this file for subsequent read/delete/retry calls.
+  MailFileRef file_ref = 8;
+}
+
+message ListMailFilesReply {
+  string folder = 1;
+  int32 total = 2;
+  repeated MailFileInfo files = 3;
+}
+
+message ReadMailFileRequest {
+  // Prefer <see cref="file_ref"/> or <see cref="folder"/> + <see cref="name"/>
+  // to avoid sending raw filesystem paths.
+  string full_path = 1 [deprecated=true];
+
+  // Optional folder hint used to resolve <see cref="name"/> when callers do not
+  // want to pass raw filesystem paths.
+  MailFolderKind folder = 2;
+
+  // Optional file name (no directory separators). When specified with
+  // <see cref="folder"/>, the server will resolve the full path.
+  string name = 3;
+
+  // When <see cref="folder"/> is unspecified but <see cref="name"/> is
+  // provided, the server will attempt to locate the file in one of the
+  // configured mail folders (queue, failed, mail merge queue). If the name is
+  // ambiguous (exists in more than one folder), the request fails.
+
+  // Preferred way to identify a mail file without requiring raw filesystem
+  // paths.
+  MailFileRef file_ref = 4;
+}
+
+message ReadMailFileReply {
+  string full_path = 1 [deprecated=true];
+  MailMessageWithSettings mail = 2;
+}
+
+message QueueMailBulkRequest {
+  repeated MailMessageWithSettings mails = 1;
+}
+
+message QueueMailBulkReply {
+  int32 total = 1;
+  int32 accepted = 2;
+  int32 failed = 3;
+}
+
+message QueueMailMergeRequest {
+  // Caller supplied identifier used to append to an existing merge batch.
+  // When empty, the server will generate an id.
+  string merge_id = 1;
+
+  // Mail that will be used as the template base for the merge. This must be
+  // supplied on the first call for a given merge_id.
+  MailMessage message = 2;
+
+  // Merge data for this batch (JSONL row strings).
+  repeated string json_lines = 3;
+}
+
+message QueueMailMergeWithSettingsRequest {
+  // Caller supplied identifier used to append to an existing merge batch.
+  // When empty, the server will generate an id.
+  string merge_id = 1;
+
+  // Mail (plus optional per-message settings) that will be used as the template base
+  // for the merge. This must be supplied on the first call for a given merge_id.
+  MailMessageWithSettings mail = 2;
+
+  // Merge data for this batch (JSONL row strings).
+  repeated string json_lines = 3;
+}
+
+message QueueMailMergeReply {
+  bool success = 1;
+  string merge_id = 2;
+
+  // The template filename created/used for this merge id.
+  string template_file_name = 3;
+
+  // The batch id allocated for this request (0 for the first batch).
+  int32 batch_id = 4;
+}
+
+message AckMailMergeBatchRequest {
+  // Merge batch identifier.
+  string merge_id = 1;
+
+  // Template file name (base file) used for this merge. This is returned by
+  // QueueMailMerge*.
+  string template_file_name = 2;
+
+  // Batch id to acknowledge.
+  int32 batch_id = 3;
+}
+
+message AckMailMergeBatchReply {
+  bool success = 1;
+  string message = 2;
+}
+
+message ListMailMergesRequest {
+  int32 take = 1; // maximum number of results
+}
+
+message MailMergeSummary {
+  string merge_id = 1;
+  string template_file_name = 2;
+  string template_full_path = 3;
+  string client_id = 4;
+  string created_utc = 5;
+  string modified_utc = 6;
+  string status = 7; // Pending|Running|Completed|Closed
+  string completed_utc = 8;
+  int32 batch_count = 9;
+  int32 pending_batch_files = 10;
+}
+
+message ListMailMergesReply {
+  repeated MailMergeSummary active = 1;
+  repeated MailMergeSummary recent = 2;
+}
+
+message GetMailMergeSummaryRequest {
+  string merge_id = 1;
+}
+
+message GetMailMergeSummaryReply {
+  MailMergeSummary summary = 1;
+}
+
+message ListMergeDispatchStateRequest {
+  int32 take = 1;
+}
+
+message MergeDispatchStateRow {
+  string merge_id = 1;
+  string template_path = 2;
+  string worker_address = 3;
+  int64 fence_token = 4;
+  string status = 5;
+  string last_error = 6;
+  string dispatched_utc = 7;
+  string completed_utc = 8;
+}
+
+message ListMergeDispatchStateReply {
+  repeated MergeDispatchStateRow rows = 1;
+}
+
+message GetAttachmentInfoRequest {
+  string token = 1;
+}
+
+message GetAttachmentInfoReply {
+  bool exists = 1;
+  bool ready = 2;
+  int32 ref_count = 3;
+  int64 length = 4;
+  string sha256_base64 = 5;
+  string uploaded_utc = 6;
+  string file_name = 7;
+  string content_type = 8;
+  string client_id = 9;
+  string merge_owner_id = 10;
+}
+
+message DeleteAttachmentRequest {
+  string token = 1;
+
+  // When true, the attachment will be deleted even if it is currently referenced.
+  // This is intended for admin operational recovery only.
+  bool force = 2;
+}
+
+message DeleteAttachmentReply {
+  bool success = 1;
+  string message = 2;
+}
+
+message DownloadAttachmentRequest {
+  string token = 1;
+
+  // Optional byte offset to start from.
+  int64 offset = 2;
+
+  // Optional maximum number of bytes to stream back.
+  int64 length = 3;
+}
+
+message DownloadAttachmentReply {
+  // Sent on the first message only.
+  string token = 1;
+  string file_name = 2;
+  string content_type = 3;
+  int64 total_length = 4;
+
+  // Raw file data. May be empty for the first message if only metadata is provided.
+  bytes chunk = 5;
+}
+
+message GetAttachmentManifestRequest {
+  string token = 1;
+}
+
+message GetAttachmentManifestReply {
+  bool exists = 1;
+
+  // Raw JSON for the manifest file.
+  string manifest_json = 2;
+}
+
+enum AttachmentSortBy {
+  ATTACHMENT_SORT_BY_UNSPECIFIED = 0;
+  ATTACHMENT_SORT_BY_UPLOADED_UTC = 1;
+  ATTACHMENT_SORT_BY_LENGTH = 2;
+  ATTACHMENT_SORT_BY_REF_COUNT = 3;
+}
+
+message ListAttachmentsRequest {
+  // Optional exact-match filters.
+  string client_id = 1;
+  string merge_owner_id = 2;
+
+  // Optional server-side date filters (ISO 8601 UTC).
+  string older_than_utc = 3;
+  string newer_than_utc = 4;
+
+  // Optional numeric filters.
+  google.protobuf.Int32Value min_ref_count = 5;
+  google.protobuf.Int32Value max_ref_count = 6;
+  google.protobuf.Int64Value min_length = 7;
+  google.protobuf.Int64Value max_length = 8;
+
+  // Convenience flags.
+  bool only_orphans = 9;
+  bool only_large = 10;
+  int64 large_threshold_bytes = 11;
+
+  // Sorting.
+  AttachmentSortBy sort_by = 12;
+  bool sort_desc = 13;
+
+  // Cursor-based paging.
+  // When provided, server will resume from this cursor instead of using skip.
+  string page_token = 14;
+
+  // Paging.
+  int32 skip = 15;
+  int32 take = 16;
+}
+
+message AttachmentListItem {
+  string token = 1;
+  bool exists = 2;
+  bool ready = 3;
+  int32 ref_count = 4;
+  int64 length = 5;
+  string sha256_base64 = 6;
+  string uploaded_utc = 7;
+  string file_name = 8;
+  string content_type = 9;
+  string client_id = 10;
+  string merge_owner_id = 11;
+}
+
+message ListAttachmentsReply {
+  int32 total = 1;
+  repeated AttachmentListItem items = 2;
+  string next_page_token = 3;
+}
+
+message DeleteAttachmentsByQueryRequest {
+  // Filters: same shape as ListAttachments.
+  string client_id = 1;
+  string merge_owner_id = 2;
+
+  // Optional server-side date filters (ISO 8601 UTC).
+  string older_than_utc = 3;
+  string newer_than_utc = 4;
+
+  // Optional numeric filters.
+  google.protobuf.Int32Value min_ref_count = 5;
+  google.protobuf.Int32Value max_ref_count = 6;
+  google.protobuf.Int64Value min_length = 7;
+  google.protobuf.Int64Value max_length = 8;
+
+  // Convenience flags.
+  bool only_orphans = 9;
+  bool only_large = 10;
+  int64 large_threshold_bytes = 11;
+
+  // Sorting.
+  AttachmentSortBy sort_by = 12;
+  bool sort_desc = 13;
+
+  // Cursor-based paging.
+  string page_token = 14;
+
+  // Behaviour.
+  bool dry_run = 15;
+
+  // When true, allow deleting referenced tokens and skip the older_than safeguard.
+  bool force = 16;
+
+  // Paging.
+  int32 skip = 17;
+  int32 take = 18;
+}
+
+message DeleteAttachmentsByQueryReply {
+  // Total index matches for the query (before safety skips).
+  int32 total_matched = 1;
+
+  // Tokens in the current page that were deleted (dry_run=false) or would be deleted (dry_run=true).
+  repeated string tokens = 2;
+
+  // Observable cleanup counters.
+  int32 deleted_count = 3;
+  int32 skipped_in_use_count = 4;
+  int32 skipped_not_found_count = 5;
+
+  // Diagnostics.
+  string message = 6;
+
+  // Cursor-based paging continuation.
+  string next_page_token = 7;
+}
+
+message GetAttachmentStatsRequest {
+  // Threshold used to classify "large" items.
+  int64 large_threshold_bytes = 1;
+
+  // Optional exact-match filters.
+  string client_id = 2;
+  string merge_owner_id = 3;
+}
+
+message AttachmentStats {
+  int64 count = 1;
+  int64 bytes = 2;
+}
+
+message GetAttachmentStatsReply {
+  AttachmentStats total = 1;
+  AttachmentStats orphans = 2;
+  AttachmentStats large = 3;
+}
+
+message PreviewOrphansRequest {
+  // Optional exact-match filters.
+  string client_id = 1;
+  string merge_owner_id = 2;
+
+  // Optional server-side upper bound date filter (ISO 8601 UTC).
+  string older_than_utc = 3;
+
+  // Cursor-based paging.
+  string page_token = 4;
+
+  // Page size.
+  int32 take = 5;
+
+  // Optional numeric filters.
+  // These are wrapper types so that callers can distinguish "unset" from "0".
+  google.protobuf.Int32Value min_ref_count = 6;
+  google.protobuf.Int32Value max_ref_count = 7;
+}
+
+message PreviewOrphansReply {
+  int32 total = 1;
+  repeated AttachmentListItem items = 2;
+  string next_page_token = 3;
+}
+
+message PreviewLargeAttachmentsRequest {
+  // Optional exact-match filters.
+  string client_id = 1;
+  string merge_owner_id = 2;
+
+  // Threshold used to classify "large" items.
+  int64 large_threshold_bytes = 3;
+
+  // Cursor-based paging.
+  string page_token = 4;
+
+  // Page size.
+  int32 take = 5;
+
+  // Optional numeric filters.
+  // These are wrapper types so that callers can distinguish "unset" from "0".
+  google.protobuf.Int32Value min_ref_count = 6;
+  google.protobuf.Int32Value max_ref_count = 7;
+  google.protobuf.Int64Value min_length = 8;
+  google.protobuf.Int64Value max_length = 9;
+}
+
+message PreviewLargeAttachmentsReply {
+  int32 total = 1;
+  repeated AttachmentListItem items = 2;
+  string next_page_token = 3;
 }

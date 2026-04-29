@@ -1,0 +1,149 @@
+@page "/settings"
+@using MailQueueNet.Grpc
+
+<PageTitle>Server Settings</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Medium">
+    <div class="d-flex justify-space-between align-center mb-2">
+        <MudText Typo="Typo.h5">MailQueue Server Settings</MudText>
+        <div class="d-flex gap-2">
+            @if (!editMode)
+            {
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="RefreshAsync" Disabled="@busy">Refresh</MudButton>
+                <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="BeginEdit" Disabled="@(busy || settings is null)">Edit</MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Secondary" OnClick="CopyAsJsonAsync" Disabled="@(busy || settings is null)">Copy as JSON</MudButton>
+            }
+            else
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync" Disabled="@busy">Save</MudButton>
+                <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="CancelEdit" Disabled="@busy">Cancel</MudButton>
+            }
+        </div>
+    </div>
+
+    <MudText Typo="Typo.caption" Class="mb-2" Color="Color.Info">Changes are applied immediately; service restart is not required.</MudText>
+
+    @if (!string.IsNullOrWhiteSpace(error))
+    {
+        <MudAlert Severity="Severity.Warning">@error</MudAlert>
+    }
+
+    @if (busy && settings is null)
+    {
+        <MudProgressLinear Indeterminate Color="Color.Primary" />
+    }
+    else if (settings is not null)
+    {
+        @if (!editMode)
+        {
+            <MudGrid>
+                <MudItem xs="12">
+                    <MudPaper Class="pa-3 mb-3" Elevation="1">
+                        <MudText Typo="Typo.subtitle1">General</MudText>
+                        <MudList T="string" Dense="true">
+                            <MudListItem T="string">Queue Folder: @settings.QueueFolder</MudListItem>
+                            <MudListItem T="string">Failed Folder: @settings.FailedFolder</MudListItem>
+                            <MudListItem T="string">Folder Refresh (s): @settings.SecondsUntilFolderRefresh</MudListItem>
+                            <MudListItem T="string">Max Concurrent Workers: @settings.MaximumConcurrentWorkers</MudListItem>
+                            <MudListItem T="string">Max Failure Retries: @settings.MaximumFailureRetries</MudListItem>
+                            <MudListItem T="string">Max Pause Minutes: @settings.MaximumPauseMinutes</MudListItem>
+                        </MudList>
+                    </MudPaper>
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudPaper Class="pa-3" Elevation="1">
+                        <MudText Typo="Typo.subtitle1">Mail Settings</MudText>
+
+                        @if (mailSettings?.Smtp is not null)
+                        {
+                            <MudList T="string" Dense="true">
+                                <MudListItem T="string">Type: SMTP</MudListItem>
+                                <MudListItem T="string">Host: @mailSettings.Smtp.Host</MudListItem>
+                                <MudListItem T="string">Port: @mailSettings.Smtp.Port</MudListItem>
+                                <MudListItem T="string">SSL: @(mailSettings.Smtp.RequiresSsl ? "Yes" : "No")</MudListItem>
+                                <MudListItem T="string">Authentication: @(mailSettings.Smtp.RequiresAuthentication ? "Yes" : "No")</MudListItem>
+                                <MudListItem T="string">Username: @mailSettings.Smtp.Username</MudListItem>
+                                <MudListItem T="string">Connection Timeout (ms): @mailSettings.Smtp.ConnectionTimeout</MudListItem>
+                            </MudList>
+                        }
+                        else if (mailSettings?.Mailgun is not null)
+                        {
+                            <MudList T="string" Dense="true">
+                                <MudListItem T="string">Type: Mailgun</MudListItem>
+                                <MudListItem T="string">Domain: @mailSettings.Mailgun.Domain</MudListItem>
+                                <MudListItem T="string">API Key: @mailSettings.Mailgun.ApiKey</MudListItem>
+                                <MudListItem T="string">Connection Timeout (ms): @mailSettings.Mailgun.ConnectionTimeout</MudListItem>
+                            </MudList>
+                        }
+                        else
+                        {
+                            <MudText Color="Color.Warning">No mail settings configured.</MudText>
+                        }
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+        }
+        else
+        {
+            <MudGrid>
+                <MudItem xs="12">
+                    <MudPaper Class="pa-3 mb-3" Elevation="1">
+                        <MudText Typo="Typo.subtitle1">Edit General Settings</MudText>
+                        <MudGrid>
+                            <MudItem xs="12" md="6">
+                                <MudTextField @bind-Value="editSettings.QueueFolder" Label="Queue Folder" />
+                            </MudItem>
+                            <MudItem xs="12" md="6">
+                                <MudTextField @bind-Value="editSettings.FailedFolder" Label="Failed Folder" />
+                            </MudItem>
+                            <MudItem xs="12" md="4">
+                                <MudNumericField T="float" @bind-Value="editSettings.SecondsUntilFolderRefresh" Label="Folder Refresh (s)" Min="0" />
+                            </MudItem>
+                            <MudItem xs="12" md="4">
+                                <MudNumericField T="int" @bind-Value="editSettings.MaximumConcurrentWorkers" Label="Max Concurrent Workers" Min="0" />
+                            </MudItem>
+                            <MudItem xs="12" md="4">
+                                <MudNumericField T="int" @bind-Value="editSettings.MaximumFailureRetries" Label="Max Failure Retries" Min="0" />
+                            </MudItem>
+                            <MudItem xs="12" md="4">
+                                <MudNumericField T="int" @bind-Value="editSettings.MaximumPauseMinutes" Label="Max Pause Minutes" Min="1" />
+                            </MudItem>
+                        </MudGrid>
+                    </MudPaper>
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudPaper Class="pa-3" Elevation="1">
+                        <MudText Typo="Typo.subtitle1">Edit Mail Settings</MudText>
+                        <MudSelect T="string" Label="Mail Service" @bind-Value="mailType">
+                            <MudSelectItem T="string" Value="@("smtp")">SMTP</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("mailgun")">Mailgun</MudSelectItem>
+                        </MudSelect>
+
+                        @if (mailType == "smtp")
+                        {
+                            <MudGrid Class="mt-2">
+                                <MudItem xs="12" md="6"><MudTextField @bind-Value="editSmtp.Host" Label="Host" /></MudItem>
+                                <MudItem xs="12" md="3"><MudNumericField T="int" @bind-Value="editSmtp.Port" Label="Port" Min="0" /></MudItem>
+                                <MudItem xs="12" md="3"><MudSwitch T="bool" @bind-Value="editSmtp.RequiresSsl" Color="Color.Primary" /> SSL</MudItem>
+                                <MudItem xs="12" md="3"><MudSwitch T="bool" @bind-Value="editSmtp.RequiresAuthentication" Color="Color.Primary" /> Authentication</MudItem>
+                                <MudItem xs="12" md="4"><MudTextField @bind-Value="editSmtp.Username" Label="Username" /></MudItem>
+                                <MudItem xs="12" md="4"><MudTextField @bind-Value="editSmtp.Password" Label="Password" InputType="InputType.Password" /></MudItem>
+                                <MudItem xs="12" md="4"><MudNumericField T="int" @bind-Value="editSmtp.ConnectionTimeout" Label="Timeout (ms)" Min="0" /></MudItem>
+                            </MudGrid>
+                        }
+                        else if (mailType == "mailgun")
+                        {
+                            <MudGrid Class="mt-2">
+                                <MudItem xs="12" md="6"><MudTextField @bind-Value="editMailgun.Domain" Label="Domain" /></MudItem>
+                                <MudItem xs="12" md="6"><MudTextField @bind-Value="editMailgun.ApiKey" Label="API Key" /></MudItem>
+                                <MudItem xs="12" md="4"><MudNumericField T="int" @bind-Value="editMailgun.ConnectionTimeout" Label="Timeout (ms)" Min="0" /></MudItem>
+                            </MudGrid>
+                        }
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+        }
+    }
+</MudContainer>

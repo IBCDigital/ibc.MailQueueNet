@@ -1,0 +1,220 @@
+syntax = "proto3";
+
+import "Protos/mail_queue.proto";
+
+option csharp_namespace = "MailForge.Grpc";
+
+package MailForge;
+
+// MailForge is a mail-merge worker service. MailQueueNet.Service dispatches
+// merge jobs to MailForge instances via these RPCs.
+service MailForgeService {
+  // Health / identity.
+  rpc GetInfo (GetInfoRequest) returns (GetInfoReply);
+
+  // Push a merge job to this worker. The worker should attempt to accept the job
+  // quickly and return an initial acknowledgement.
+  rpc StartMergeJob (StartMergeJobRequest) returns (StartMergeJobReply);
+
+  // Cancel a running merge job.
+  rpc CancelMergeJob (CancelMergeJobRequest) returns (CancelMergeJobReply);
+
+  // Pause a running merge job.
+  rpc PauseMergeJob (PauseMergeJobRequest) returns (PauseMergeJobReply);
+
+  // Resume a paused merge job.
+  rpc ResumeMergeJob (ResumeMergeJobRequest) returns (ResumeMergeJobReply);
+
+  // Deletes a merge job and its stored state (DB + batch files).
+  rpc DeleteMergeJob (DeleteMergeJobRequest) returns (DeleteMergeJobReply);
+
+  // Fetch basic progress for a running or completed job.
+  rpc GetMergeJobStatus (GetMergeJobStatusRequest) returns (GetMergeJobStatusReply);
+
+  // Optional batched ingestion endpoint. The queue service owns the lease/fence,
+  // but can push additional merge directives in batches.
+  rpc AppendMergeBatch (AppendMergeBatchRequest) returns (AppendMergeBatchReply);
+
+  // Admin/reporting endpoints (mTLS admin clients).
+  rpc ListMergeJobs (ListMergeJobsRequest) returns (ListMergeJobsReply);
+  rpc GetMergeJobDetail (GetMergeJobDetailRequest) returns (GetMergeJobDetailReply);
+
+  // Admin/operator endpoint to preview stored batch rows.
+  rpc PreviewMergeBatch (PreviewMergeBatchRequest) returns (PreviewMergeBatchReply);
+
+  // Logs (admin only).
+  rpc ListWorkerLogFiles (MailQueue.ListLogsRequest) returns (MailQueue.ListLogsReply);
+  rpc ReadWorkerLog (MailQueue.ReadLogRequest) returns (MailQueue.ReadLogReply);
+  rpc StreamWorkerLog (MailQueue.ReadLogRequest) returns (stream MailQueue.ReadLogReply);
+}
+
+message GetInfoRequest {}
+
+message GetInfoReply {
+  string worker_id = 1;
+  string version = 2;
+  repeated string supported_engines = 3; // e.g. ["liquid", "handlebars"]
+}
+
+enum TemplateEngine {
+  TEMPLATE_ENGINE_UNSPECIFIED = 0;
+  TEMPLATE_ENGINE_LIQUID = 1;
+  TEMPLATE_ENGINE_HANDLEBARS = 2;
+}
+
+message StartMergeJobRequest {
+  string job_id = 1;
+  TemplateEngine engine = 2;
+
+  // Protobuf-serialised mail template produced by MailQueueNet (subject/body/from/etc.).
+  // This is sent inline so MailForge does not need access to the queue's filesystem.
+  MailQueue.MailMessageWithSettings template = 3;
+
+  // Deprecated: callers should not send filesystem paths.
+  // MailForge resolves job state from its own configured roots (MailForge:JobWorkRoots).
+  string job_work_root = 4 [deprecated=true];
+
+  // Optional client identifier (for logging and policy decisions).
+  string client_id = 5;
+}
+
+message StartMergeJobReply {
+  bool accepted = 1;
+  string message = 2;
+}
+
+message CancelMergeJobRequest {
+  string job_id = 1;
+}
+
+message CancelMergeJobReply {
+  bool success = 1;
+  string message = 2;
+}
+
+message PauseMergeJobRequest {
+  string job_id = 1;
+}
+
+message PauseMergeJobReply {
+  bool success = 1;
+  string message = 2;
+}
+
+message ResumeMergeJobRequest {
+  string job_id = 1;
+}
+
+message ResumeMergeJobReply {
+  bool success = 1;
+  string message = 2;
+}
+
+message DeleteMergeJobRequest {
+  string merge_id = 1;
+
+  // Deprecated: MailForge resolves job state from its configured roots.
+  string job_work_root = 2 [deprecated=true];
+}
+
+message DeleteMergeJobReply {
+  bool success = 1;
+  string message = 2;
+}
+
+message GetMergeJobStatusRequest {
+  string job_id = 1;
+  
+  // Deprecated: MailForge resolves job state from its configured roots.
+  string job_work_root = 2 [deprecated=true];
+}
+
+message GetMergeJobStatusReply {
+  string job_id = 1;
+  string status = 2; // e.g. Pending|Running|Completed|Failed|Cancelled
+  int64 total = 3;
+  int64 completed = 4;
+  int64 failed = 5;
+  string last_error = 6;
+  string updated_utc = 7;
+}
+
+message AppendMergeBatchRequest {
+  string merge_id = 1;
+
+  // The .mail template file name in the MailQueue merge folder. Used when acknowledging a batch.
+  string template_file_name = 2;
+
+  // Batch id that originated these rows (corresponds to the .N.jsonl suffix).
+  int32 batch_id = 3;
+
+  repeated string json_lines = 4;
+}
+
+message AppendMergeBatchReply {
+  bool success = 1;
+  int32 accepted = 2;
+  string message = 3;
+}
+
+message ListMergeJobsRequest {
+  int32 take = 1;
+}
+
+message MergeJobSummary {
+  string merge_id = 1;
+  string status = 2;
+  string client_id = 3;
+  string started_utc = 4;
+  string finished_utc = 5;
+  int64 total_rows = 6;
+  int64 completed_rows = 7;
+  int64 failed_rows = 8;
+  int32 batch_count = 9;
+  string last_error = 10;
+}
+
+message ListMergeJobsReply {
+  repeated MergeJobSummary jobs = 1;
+}
+
+message GetMergeJobDetailRequest {
+  string merge_id = 1;
+
+  // Deprecated: MailForge resolves job state from its configured roots.
+  string job_work_root = 2 [deprecated=true];
+}
+
+message MergeBatchStatus {
+  int32 batch_id = 1;
+  string status = 2;
+  int64 total_rows = 3;
+  int64 completed_rows = 4;
+  int64 failed_rows = 5;
+  string updated_utc = 6;
+}
+
+message GetMergeJobDetailReply {
+  MergeJobSummary summary = 1;
+  MailQueue.MailMessageWithSettings template = 2;
+  repeated MergeBatchStatus batches = 3;
+  int32 percent_complete = 4;
+}
+
+message PreviewMergeBatchRequest {
+  string merge_id = 1;
+  int32 batch_id = 2;
+
+  // Deprecated: batch previews are resolved from MailForge-managed batch storage.
+  string job_work_root = 3 [deprecated=true];
+  int32 take = 4;
+  int32 skip = 5;
+}
+
+message PreviewMergeBatchReply {
+  bool success = 1;
+  string message = 2;
+  int32 batch_id = 3;
+  int32 total_rows = 4;
+  repeated string rows = 5;
+}

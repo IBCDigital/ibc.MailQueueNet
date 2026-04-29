@@ -1,0 +1,59 @@
+@page "/client-generator"
+
+<MudContainer MaxWidth="MaxWidth.Medium">
+    <MudPaper Class="pa-4" Elevation="1">
+        <MudText Typo="Typo.h6">Client Credentials Generator</MudText>
+        <MudText Typo="Typo.body2" Class="mb-2">Enter a Client ID and the shared secret to generate the client pass header.</MudText>
+
+        <MudStack Spacing="2">
+            <MudTextField @bind-Value="this.clientId"
+                          Label="Client ID"
+                          Immediate="true"
+                          Placeholder="e.g. marketing-app"
+                          Variant="Variant.Outlined" />
+
+            <MudTextField @bind-Value="this.sharedSecret"
+                          Label="Shared Secret"
+                          InputType="@(this.showSecret ? InputType.Text : InputType.Password)"
+                          Variant="Variant.Outlined"
+                          Adornment="Adornment.End"
+                          AdornmentIcon="@((this.showSecret ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility))"
+                          OnAdornmentClick="this.ToggleSecretVisibility"
+                          Immediate="true" />
+
+            <MudStack Row="true" Spacing="2">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="this.GenerateAsync" Disabled="@(string.IsNullOrWhiteSpace(this.clientId) || string.IsNullOrWhiteSpace(this.sharedSecret))">Generate</MudButton>
+                <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="this.Clear">Clear</MudButton>
+            </MudStack>
+
+            <MudDivider />
+
+            <MudText Typo="Typo.subtitle2">Computed Client Pass</MudText>
+            <MudTextField Value="@this.clientPass"
+                          ReadOnly="true"
+                          InputType="@(this.showPass ? InputType.Text : InputType.Password)"
+                          Variant="Variant.Outlined"
+                          Adornment="Adornment.End"
+                          AdornmentIcon="@Icons.Material.Filled.ContentCopy"
+                          OnAdornmentClick="this.CopyPassAsync"
+                          HelperText="Header name: x-client-pass"
+                          Placeholder="— Generate to view —" />
+
+            <MudStack Row="true" Spacing="2">
+                <MudButton Variant="Variant.Text" Color="Color.Default" OnClick="this.TogglePassVisibility">
+                    <MudIcon Icon="@(this.showPass ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)" Class="me-1" />
+                    @(this.showPass ? "Hide" : "Show")
+                </MudButton>
+                <MudButton Variant="Variant.Text" Color="Color.Default" OnClick="this.CopyHeadersAsync" Disabled="@(string.IsNullOrWhiteSpace(this.clientPass))">
+                    <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Class="me-1" /> Copy sample headers
+                </MudButton>
+            </MudStack>
+
+            <MudAlert Severity="Severity.Info">
+                Send these headers with requests:
+                <br />x-client-id: <b>@this.clientId</b>
+                <br />x-client-pass: <i>[generated]</i>
+            </MudAlert>
+        </MudStack>
+    </MudPaper>
+</MudContainer>

@@ -16,5 +16,9 @@
     <FallbackCulture>en-US</FallbackCulture>
     <VerifyUploadedFiles>false</VerifyUploadedFiles>
     <_LastSelectedProfileId>D:\Development\apps\MailQueueNet\MailQueueNet.Service\Properties\PublishProfiles\Windows.pubxml</_LastSelectedProfileId>
+    <ActiveDebugProfile>WSL</ActiveDebugProfile>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <DebuggerFlavor>ProjectDebugger</DebuggerFlavor>
   </PropertyGroup>
 </Project>

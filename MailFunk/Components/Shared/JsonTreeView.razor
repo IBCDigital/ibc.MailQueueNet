@@ -1,0 +1,8 @@
+@using MailFunk.Models
+
+<MudTreeView T="JsonTreeNode">
+    @foreach (var node in this.Nodes)
+    {
+        <JsonTreeViewItem Node="node" />
+    }
+</MudTreeView>

@@ -1,0 +1,201 @@
+﻿@page "/"
+@using MailFunk.Models
+@using MailQueueNet.Grpc
+
+<PageTitle>Dashboard</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.False">
+    <div class="d-flex justify-space-between align-center mb-4 flex-wrap gap-4">
+        <div class="d-flex flex-column">
+            <MudText Typo="Typo.h5">Mail Queue Dashboard</MudText>
+            <MudText Typo="Typo.caption">@LastRefreshLine</MudText>
+        </div>
+        <div class="d-flex align-center gap-2 flex-wrap">
+            <MudChip T="string" Color="@(isPaused ? Color.Warning : Color.Success)" Variant="Variant.Filled">@(isPaused ? "Paused" : "Processing")</MudChip>
+            @if (isPaused && autoResumeUtc.HasValue)
+            {
+                <MudText Typo="Typo.caption">Auto-resume in: @countdown</MudText>
+            }
+            else if (isPaused && !autoResumeUtc.HasValue)
+            {
+                <MudText Typo="Typo.caption">Manual resume required</MudText>
+            }
+            @if (!isPaused)
+            {
+                <MudNumericField T="int" @bind-Value="pauseMinutes" Min="1" Max="maxPauseMinutes" Style="width:90px" Label="Minutes" />
+            }
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="RefreshAll" Disabled="@refreshing">Refresh</MudButton>
+            <MudButton Variant="Variant.Filled" Color="@(isPaused ? Color.Success : Color.Warning)" OnClick="TogglePauseAsync" Disabled="@pauseBusy">
+                @(isPaused ? "Resume" : "Pause")
+            </MudButton>
+        </div>
+    </div>
+
+    <MudPaper Class="pa-3 mb-4" Elevation="1">
+        <div class="d-flex align-center gap-2 flex-wrap">
+            <MudText Typo="Typo.subtitle1">Usage period</MudText>
+            <MudSelect T="int" Value="@selectedRangeMinutes" ValueChanged="OnRangeChanged" Dense="true">
+                <MudSelectItem T="int" Value="10">Last 10 min</MudSelectItem>
+                <MudSelectItem T="int" Value="30">Last 30 min</MudSelectItem>
+                <MudSelectItem T="int" Value="60">Last hour</MudSelectItem>
+                <MudSelectItem T="int" Value="180">Last 3 hours</MudSelectItem>
+                <MudSelectItem T="int" Value="1440">Last day</MudSelectItem>
+                <MudSelectItem T="int" Value="10080">Last week</MudSelectItem>
+            </MudSelect>
+            @if (usageBusy)
+            {
+                <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+            }
+        </div>
+        <MudGrid Class="mt-2">
+            <MudItem xs="12" sm="6" md="3"><MudText Typo="Typo.body2">Most active client</MudText><MudText Typo="Typo.h6">@mostActiveClient</MudText></MudItem>
+            <MudItem xs="12" sm="6" md="3"><MudText Typo="Typo.body2">Distinct clients</MudText><MudText Typo="Typo.h6">@distinctClients</MudText></MudItem>
+            <MudItem xs="12" sm="6" md="3"><MudText Typo="Typo.body2">Queued in period</MudText><MudText Typo="Typo.h6">@emailsInRange</MudText></MudItem>
+            <MudItem xs="12" sm="6" md="3"><MudText Typo="Typo.body2">Failures in period</MudText><MudText Typo="Typo.h6">@failuresInRange</MudText></MudItem>
+            <MudItem xs="12" sm="6" md="3"><MudText Typo="Typo.body2">Top failure client</MudText><MudText Typo="Typo.h6">@topFailureClient</MudText></MudItem>
+            <MudItem xs="12" sm="6" md="3"><MudText Typo="Typo.body2">Sent in period</MudText><MudText Typo="Typo.h6">@sentInRange</MudText></MudItem>
+            <MudItem xs="12" sm="6" md="3"><MudText Typo="Typo.body2">Failed in period</MudText><MudText Typo="Typo.h6">@failedInRange</MudText></MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <MudGrid>
+        <MudItem xs="12">
+            <MudPaper Class="pa-3 mb-4" Elevation="1">
+                <div class="d-flex justify-space-between align-center flex-wrap gap-2">
+                    <MudText Typo="Typo.h6">MailMerges</MudText>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" Href="mailforge">Open MailForge</MudButton>
+                </div>
+
+                @if (this.mailMergeBusy)
+                {
+                    <MudProgressCircular Indeterminate="true" Size="Size.Small" Class="mt-2" />
+                }
+                else if ((this.activeMerges?.Count ?? 0) == 0 && (this.recentMerges?.Count ?? 0) == 0)
+                {
+                    <MudText Typo="Typo.body2" Class="mt-2">No mail merges found.</MudText>
+                }
+                else
+                {
+                    <MudGrid Class="mt-2">
+                        <MudItem xs="12" md="6">
+                            <MudText Typo="Typo.subtitle2">Active</MudText>
+                            <MudList T="string" Dense="true">
+                                @foreach (var m in this.activeMerges)
+                                {
+                                    <MudListItem T="string">
+                                        <MudText Typo="Typo.body2">
+                                            <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="@(() => this.SelectMergeTemplate(m))">@m.MergeId</MudButton>
+                                            (@m.Status)
+                                            @if (m.HasProgress)
+                                            {
+                                                <span> - sent @m.ProgressDisplay</span>
+                                                @if (m.FailedRows > 0)
+                                                {
+                                                    <span>, failed @m.FailedRows</span>
+                                                }
+                                            }
+                                            <span> - batches @m.BatchCount</span>
+                                        </MudText>
+                                    </MudListItem>
+                                }
+                            </MudList>
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudText Typo="Typo.subtitle2">Recent</MudText>
+                            <MudList T="string" Dense="true">
+                                @foreach (var m in this.recentMerges)
+                                {
+                                    <MudListItem T="string">
+                                        <MudText Typo="Typo.body2">
+                                            <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="@(() => this.SelectMergeTemplate(m))">@m.MergeId</MudButton>
+                                            (@m.Status)
+                                            @if (m.HasProgress)
+                                            {
+                                                <span> - sent @m.ProgressDisplay</span>
+                                                @if (m.FailedRows > 0)
+                                                {
+                                                    <span>, failed @m.FailedRows</span>
+                                                }
+                                            }
+                                            <span> - batches @m.BatchCount</span>
+                                        </MudText>
+                                    </MudListItem>
+                                }
+                            </MudList>
+                        </MudItem>
+                    </MudGrid>
+                }
+
+                <MudDivider Class="my-3" />
+
+                <MudText Typo="Typo.subtitle2">Dispatcher state</MudText>
+                @if (this.dispatchStateBusy)
+                {
+                    <MudProgressCircular Indeterminate="true" Size="Size.Small" Class="mt-2" />
+                }
+                else if ((this.dispatchRows?.Count ?? 0) == 0)
+                {
+                    <MudText Typo="Typo.body2" Class="mt-2">No dispatcher state rows found.</MudText>
+                }
+                else
+                {
+                    <MudTable Items="this.dispatchRows" Dense="true" Hover="true" Class="mt-2">
+                        <HeaderContent>
+                            <MudTh>Merge Id</MudTh>
+                            <MudTh>Status</MudTh>
+                            <MudTh>Worker</MudTh>
+                            <MudTh align="right">Fence</MudTh>
+                            <MudTh>Dispatched (UTC)</MudTh>
+                            <MudTh>Completed (UTC)</MudTh>
+                            <MudTh>Last error</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Merge Id">@context.MergeId</MudTd>
+                            <MudTd DataLabel="Status">@context.Status</MudTd>
+                            <MudTd DataLabel="Worker">@context.WorkerAddress</MudTd>
+                            <MudTd DataLabel="Fence" Align="Right">@context.FenceToken</MudTd>
+                            <MudTd DataLabel="Dispatched (UTC)">@context.DispatchedUtc</MudTd>
+                            <MudTd DataLabel="Completed (UTC)">@context.CompletedUtc</MudTd>
+                            <MudTd DataLabel="Last error">@context.LastError</MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+            </MudPaper>
+        </MudItem>
+
+        @if (!this.summary.IsRemoteAccessible)
+        {
+            <MudItem xs="12">
+                <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true">
+                    @this.summary.RemoteStatusMessage
+                </MudAlert>
+            </MudItem>
+        }
+
+        <MudItem xs="12" md="6">
+            <MailFunk.Components.Shared.MailFolderPanel Title="Mail Queue"
+                                                        FolderPath="@this.summary.QueuePath"
+                                                        FolderKind="MailFolderKind.Queue"
+                                                        TotalCount="@this.summary.QueueCount"
+                                                        Files="@this.queueFiles"
+                                                        EnableBulkActions="true"
+                                                        AllowRetry="false"
+                                                        OnLoadMore="this.LoadMoreQueue"
+                                                        OnSelectedChanged="this.OnQueueSelectedChanged" />
+        </MudItem>
+        <MudItem xs="12" md="6">
+            <MailFunk.Components.Shared.MailFolderPanel Title="Failed Mail"
+                                                        FolderPath="@this.summary.FailedPath"
+                                                        FolderKind="MailFolderKind.Failed"
+                                                        TotalCount="@this.summary.FailedCount"
+                                                        Files="@this.failedFiles"
+                                                        EnableBulkActions="true"
+                                                        AllowRetry="true"
+                                                        OnLoadMore="this.LoadMoreFailed"
+                                                        OnSelectedChanged="this.OnFailedSelectedChanged" />
+        </MudItem>
+        <MudItem xs="12">
+            <MailFunk.Components.Shared.MailPreview Entry="this.selectedFile" />
+        </MudItem>
+    </MudGrid>
+</MudContainer>

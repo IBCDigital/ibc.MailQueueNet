@@ -1,17 +1,48 @@
-﻿using Microsoft.Extensions.Configuration;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
-using System;
-using System.IO;
-using System.Text;
+﻿// <copyright file="SettingsController.cs" company="IBC Digital">
+//   Copyright (c) IBC Digital. All rights reserved.
+//
+//  Derived from “MailQueueNet” by Daniel Cohen Gindi
+//  (https://github.com/danielgindi/MailQueueNet).
+//
+//  Original portions:
+//    © 2014 Daniel Cohen Gindi (danielgindi@gmail.com)
+//    Licensed under the MIT Licence.
+//  Modifications and additions:
+//    © 2025 IBC Digital Pty Ltd
+//    Distributed under the same MIT Licence.
+//
+//  The above notice and this permission notice shall be included in
+//  all copies or substantial portions of this file.
+// </copyright>
 
 namespace MailQueueNet.Service.Core
 {
+    using System;
+    using System.IO;
+    using System.Text;
+    using Microsoft.Extensions.Configuration;
+    using Newtonsoft.Json;
+    using Newtonsoft.Json.Linq;
+
     public static class SettingsController
     {
+        private const string OverridesFileName = "appsettings.overrides.json";
+        private const string OverridesDirectoryEnvVar = "MAILQUEUENET_CONFIG_DIR";
+
         public static JObject ReadSettingsForUpdate()
         {
-            var filePath = Path.Combine(AppContext.BaseDirectory, "appSettings.json");
+            var filePath = GetOverridesFilePath();
+
+            if (!File.Exists(filePath))
+            {
+                EnsureDirectoryExistsForFile(filePath);
+                var defaults = new JObject
+                {
+                    ["queue"] = new JObject(),
+                };
+
+                File.WriteAllText(filePath, defaults.ToString(Formatting.Indented), Encoding.UTF8);
+            }
 
             using (var reader = new StringReader(File.ReadAllText(filePath, Encoding.UTF8)))
             using (var jsonReader = new JsonTextReader(reader)
@@ -26,7 +57,8 @@ namespace MailQueueNet.Service.Core
 
         public static void CommitSettingsUpdates(JObject jSettings)
         {
-            var filePath = Path.Combine(AppContext.BaseDirectory, "appSettings.json");
+            var filePath = GetOverridesFilePath();
+            EnsureDirectoryExistsForFile(filePath);
 
             File.WriteAllText(filePath, jSettings.ToString(Formatting.Indented), Encoding.UTF8);
         }
@@ -39,7 +71,9 @@ namespace MailQueueNet.Service.Core
             for (var i = 0; i < keyParts.Length - 1; i++)
             {
                 if (!(jElement is JObject))
+                {
                     return;
+                }
 
                 var keyPart = keyParts[i];
                 if (((JObject)jElement).ContainsKey(keyPart))
@@ -60,6 +94,8 @@ namespace MailQueueNet.Service.Core
 
         public static void AddOrUpdateAppSetting<T>(string key, T value)
         {
+            // Intentionally restrict file updates to admin routes that call SetSettings/SetMailSettings.
+            // This helper remains for compatibility but still writes to the overrides file.
             var jSettings = ReadSettingsForUpdate();
             AddOrUpdateAppSetting(jSettings, key, value);
             CommitSettingsUpdates(jSettings);
@@ -71,9 +107,11 @@ namespace MailQueueNet.Service.Core
 
             AddOrUpdateAppSetting(jSettings, "queue:queue_folder", settings.QueueFolder);
             AddOrUpdateAppSetting(jSettings, "queue:failed_folder", settings.FailedFolder);
+            AddOrUpdateAppSetting(jSettings, "queue:mail_merge_queue_folder", settings.MailMergeQueueFolder);
             AddOrUpdateAppSetting(jSettings, "queue:seconds_until_folder_refresh", settings.SecondsUntilFolderRefresh);
             AddOrUpdateAppSetting(jSettings, "queue:maximum_concurrent_workers", settings.MaximumConcurrentWorkers);
             AddOrUpdateAppSetting(jSettings, "queue:maximum_failure_retries", settings.MaximumFailureRetries);
+            AddOrUpdateAppSetting(jSettings, "queue:maximum_pause_minutes", settings.MaximumPauseMinutes);
 
             CommitSettingsUpdates(jSettings);
         }
@@ -94,6 +132,7 @@ namespace MailQueueNet.Service.Core
                         AddOrUpdateAppSetting(jSettings, "queue:smtp:password", settings.Smtp.Password);
                         AddOrUpdateAppSetting(jSettings, "queue:smtp:connection_timeout", settings.Smtp.ConnectionTimeout);
                     }
+
                     break;
                 case Grpc.MailSettings.SettingsOneofCase.Mailgun:
                     {
@@ -101,11 +140,13 @@ namespace MailQueueNet.Service.Core
                         AddOrUpdateAppSetting(jSettings, "queue:mailgun:api_key", settings.Mailgun.ApiKey);
                         AddOrUpdateAppSetting(jSettings, "queue:mailgun:connection_timeout", settings.Mailgun.ConnectionTimeout);
                     }
+
                     break;
                 default:
                     {
-                        AddOrUpdateAppSetting("queue:mail_service_type", "");
+                        AddOrUpdateAppSetting(jSettings, "queue:mail_service_type", string.Empty);
                     }
+
                     break;
             }
 
@@ -118,9 +159,11 @@ namespace MailQueueNet.Service.Core
             {
                 QueueFolder = configuration.GetValue("queue:queue_folder", "~/mail/queue"),
                 FailedFolder = configuration.GetValue("queue:failed_folder", "~/mail/failed"),
+                MailMergeQueueFolder = configuration.GetValue("queue:mail_merge_queue_folder", "~/mail/merge"),
                 SecondsUntilFolderRefresh = configuration.GetValue("queue:seconds_until_folder_refresh", 10.0f),
                 MaximumConcurrentWorkers = configuration.GetValue("queue:maximum_concurrent_workers", 4),
                 MaximumFailureRetries = configuration.GetValue("queue:maximum_failure_retries", 5),
+                MaximumPauseMinutes = configuration.GetValue("queue:maximum_pause_minutes", 30),
             };
         }
 
@@ -132,20 +175,22 @@ namespace MailQueueNet.Service.Core
                     {
                         var timeout = configuration.GetValue("queue:smtp:connection_timeout", 100000);
                         if (timeout <= 0)
+                        {
                             timeout = 100000;
+                        }
 
                         return new Grpc.MailSettings
                         {
                             Smtp = new Grpc.SmtpMailSettings
                             {
-                                Host = configuration.GetValue("queue:smtp:server", ""),
+                                Host = configuration.GetValue("queue:smtp:server", string.Empty),
                                 Port = configuration.GetValue("queue:smtp:port", 0),
                                 RequiresSsl = configuration.GetValue("queue:smtp:ssl", false),
                                 RequiresAuthentication = configuration.GetValue("queue:smtp:authentication", false),
-                                Username = configuration.GetValue("queue:smtp:username", ""),
-                                Password = configuration.GetValue("queue:smtp:password", ""),
+                                Username = configuration.GetValue("queue:smtp:username", string.Empty),
+                                Password = configuration.GetValue("queue:smtp:password", string.Empty),
                                 ConnectionTimeout = timeout,
-                            }
+                            },
                         };
                     }
 
@@ -153,22 +198,54 @@ namespace MailQueueNet.Service.Core
                     {
                         var timeout = configuration.GetValue("queue:mailgun:connection_timeout", 100000);
                         if (timeout <= 0)
+                        {
                             timeout = 100000;
+                        }
 
                         return new Grpc.MailSettings
                         {
                             Mailgun = new Grpc.MailgunMailSettings
                             {
-                                Domain = configuration.GetValue("queue:mailgun:domain", ""),
-                                ApiKey = configuration.GetValue("queue:mailgun:api_key", ""),
+                                Domain = configuration.GetValue("queue:mailgun:domain", string.Empty),
+                                ApiKey = configuration.GetValue("queue:mailgun:api_key", string.Empty),
                                 ConnectionTimeout = timeout,
-                            }
+                            },
                         };
                     }
             }
 
             // Something really empty that won't send anything
             return new Grpc.MailSettings();
+        }
+
+        private static string GetOverridesFilePath()
+        {
+            var configDir = Environment.GetEnvironmentVariable(OverridesDirectoryEnvVar);
+            if (!string.IsNullOrWhiteSpace(configDir))
+            {
+                return Path.Combine(configDir, OverridesFileName);
+            }
+
+            if (Directory.Exists("/data/config"))
+            {
+                return Path.Combine("/data/config", OverridesFileName);
+            }
+
+            return Path.Combine(AppContext.BaseDirectory, OverridesFileName);
+        }
+
+        private static void EnsureDirectoryExistsForFile(string filePath)
+        {
+            var dir = Path.GetDirectoryName(filePath);
+            if (string.IsNullOrWhiteSpace(dir))
+            {
+                return;
+            }
+
+            if (!Directory.Exists(dir))
+            {
+                Directory.CreateDirectory(dir);
+            }
         }
     }
 }

@@ -1,0 +1,54 @@
+services:
+  mailqueuenet-service:
+    container_name: mailqueuenet-service
+    image: docker-hub.internal.ibc.com.au/mailqueuenet-service:latest
+    restart: unless-stopped
+    env_file:
+      - ./app/mailqueuenet-service/.env
+    networks:
+      - default
+      - npm_proxy
+    ports:
+      - "5000:5000"
+      - "5001:5001"
+    volumes:
+      - ./app/mailqueuenet-service/data:/data
+
+  mailforge:
+    container_name: mailforge
+    image: docker-hub.internal.ibc.com.au/mailforge:latest
+    restart: unless-stopped
+    depends_on:
+      - mailqueuenet-service
+    env_file:
+      - ./app/mailforge/.env
+    networks:
+      - default
+    ports:
+      - "5002:5002"
+      - "5003:5003"
+    volumes:
+      - ./app/mailforge/data:/data
+
+  mailfunk:
+    container_name: mailfunk
+    image: docker-hub.internal.ibc.com.au/mailfunk:latest
+    restart: unless-stopped
+    depends_on:
+      - mailqueuenet-service
+      - mailforge
+    env_file:
+      - ./app/mailfunk/.env
+    networks:
+      - default
+      - npm_proxy
+    ports:
+      - "5192:5004"
+      - "7173:5005"
+    volumes:
+      - ./app/mailfunk/data:/data  # Data Protection keys for stable OIDC cookie/state handling
+
+networks:
+  npm_proxy:
+    external: true
+    name: open-appsec-ningx-proxy-manager-webgui_default

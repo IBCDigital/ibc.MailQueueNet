@@ -1,0 +1,49 @@
+@* Shows connection status for the MailQueueNet gRPC service and allows manual retry using IConnectivityService *@
+
+<div class="status @(Connectivity.IsOnline ? "online" : "offline")">
+    <span class="dot" title="@StatusText"></span>
+    <span class="label">@StatusText</span>
+
+    @if (Connectivity.IsOnline && !string.IsNullOrWhiteSpace(Connectivity.ClientCertificateThumbprint))
+    {
+        <MudTooltip Text="Secure connection">
+            <MudIconButton Icon="@Icons.Material.Filled.Lock" Color="Color.Success" Size="Size.Small" OnClick="() => showCert = true" />
+        </MudTooltip>
+    }
+
+    @if (!Connectivity.IsOnline)
+    {
+        <button class="btn btn-sm btn-light" disabled="@(Connectivity.IsChecking)" @onclick="ReconnectAsync">
+            @(Connectivity.IsChecking ? "Connecting..." : "Connect")
+        </button>
+        @if (!string.IsNullOrWhiteSpace(Connectivity.LastError))
+        {
+            <span class="text-warning small ms-2" title="@Connectivity.LastError">!</span>
+        }
+    }
+</div>
+
+<MudDialog @bind-is-visible="showCert" max-width="MaxWidth.Small" disable-backdrop-click="true" close-on-escape-key="true">
+    <DialogContent>
+        <MudText Typo="Typo.h6">Connection Security</MudText>
+        @if (Connectivity.IsOnline && !string.IsNullOrWhiteSpace(Connectivity.ClientCertificateThumbprint))
+        {
+            <MudList T="string" Dense="true">
+                <MudListItem T="string">Subject: @Connectivity.ClientCertificateSubject</MudListItem>
+                <MudListItem T="string">Thumbprint: @Connectivity.ClientCertificateThumbprint</MudListItem>
+                <MudListItem T="string">Status: Secure (mTLS client cert present)</MudListItem>
+            </MudList>
+        }
+        else
+        {
+            <MudText Color="Color.Warning">No client certificate detected.</MudText>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => showCert = false" Color="Color.Primary">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code{
+    private bool showCert;
+}

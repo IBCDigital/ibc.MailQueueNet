@@ -1,3 +1,5 @@
+“This fork extends MailQueueNet and retains its original MIT licence.”
+
 MailQueueNet
 ================
 

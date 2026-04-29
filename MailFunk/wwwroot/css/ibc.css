@@ -1,0 +1,68 @@
+:root{
+  /* MailFunk brand palette (adjust to match wordmark exactly if needed) */
+  --mf-primary:#06283D; /* dark navy */
+  --mf-accent:#47B5FF;  /* bright cyan */
+  --mf-dark:#0B1E2D;    /* deep slate */
+  --mf-light:#DFF6FF;   /* very light cyan */
+  --mf-text:#0F172A;    /* slate-900 */
+}
+
+body{background-color:var(--mf-light);color:var(--mf-text);}
+
+.ibc-header{
+  display:flex;align-items:center;gap:.75rem;
+  background:var(--mf-primary);
+  color:#fff;padding:.75rem 1rem;
+  box-shadow:0 2px 6px rgba(0,0,0,.1);
+}
+.ibc-header a{color:#fff;text-decoration:none}
+.ibc-header .brand{display:flex;align-items:center;gap:.5rem;font-weight:600}
+.ibc-header img{height:28px;width:auto}
+
+/* Brand wordmark inside left nav */
+.brand-wordmark{max-width: 100%; height: 28px; width: auto;}
+
+.sidebar{background:var(--mf-dark)}
+.navbar.navbar-dark{background:transparent}
+.navbar-brand{display:flex;align-items:center;gap:.5rem}
+.nav-link{color:#cfe0ef}
+.nav-link.active, .nav-link:hover{color:#fff}
+
+.card{
+  background:#fff;border:1px solid rgba(0,0,0,.06);
+  border-radius:.5rem;padding:1rem;margin:.5rem 0;
+  box-shadow:0 1px 3px rgba(0,0,0,.05);
+}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem}
+.card h3{margin:0 0 .25rem 0;font-size:1rem;color:var(--mf-primary)}
+.card .value{font-size:1.8rem;font-weight:700;color:var(--mf-text)}
+.card .sub{color:#475569;font-size:.85rem}
+
+.file-list{list-style:none;padding-left:0;margin:0}
+.file-list li{padding:.25rem 0;border-bottom:1px solid rgba(0,0,0,.06)}
+.file-list li:last-child{border-bottom:none}
+.file-list li.selected{background:rgba(71,181,255,.15)}
+
+/* Service status indicator */
+.status{display:flex;align-items:center;gap:.5rem}
+.status .dot{width:10px;height:10px;border-radius:50%;background:#ef4444}
+.status.online .dot{background:#22c55e}
+.status .label{font-size:.9rem}
+
+/* Preview pane */
+.preview{margin-top:1rem;background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:.5rem;padding:1rem}
+.preview .preview-header{display:flex;justify-content:space-between;gap:1rem;margin-bottom:.5rem}
+.preview .meta{color:#475569;font-size:.85rem}
+.preview .preview-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem;margin:.5rem 0}
+.preview .field{display:flex;gap:.5rem}
+.preview .field span{min-width:90px;color:#475569}
+.preview .body{margin-top:.5rem;border-top:1px dashed rgba(0,0,0,.1);padding-top:.5rem;white-space:pre-wrap}
+.preview details{margin-top:.5rem}
+.preview.empty,.preview.error{padding:1rem;color:#475569}
+
+.hover-mail-item{transition:background-color .15s ease;border-radius:4px}
+.hover-mail-item:hover{background:rgba(0,0,0,.04)}
+.selected-mail-item{background:rgba(71,181,255,.25)!important;outline:2px solid var(--mf-accent);}
+.mail-item{cursor:pointer;border-radius:4px;transition:background-color .12s ease}
+.mail-item:hover{background:rgba(0,0,0,.05)}
+.mail-item.mud-selected-item,.mail-item.selected-mail-item{background:rgba(71,181,255,.25)!important}

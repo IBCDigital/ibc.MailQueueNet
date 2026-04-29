@@ -1,0 +1,142 @@
+services:
+  mailqueueservice:
+    container_name: mailqueueservice
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    build:
+      context: .
+      dockerfile: MailQueueNet.Service/Dockerfile
+      args:
+        - CERT_PASSWORD=DevPassword123!
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      # In containers, 'localhost' is the container itself. Use the host's Mailpit instance.
+      - queue__smtp__server=host.docker.internal
+      - queue__smtp__port=1025
+      # Ensure the service binds HTTP on 5000 (set in Dockerfile)
+      - ASPNETCORE_URLS=http://0.0.0.0:5000;https://0.0.0.0:5001
+      - ASPNETCORE_Kestrel__Certificates__Default__Path=/https/mailqueuenet.pfx
+      - ASPNETCORE_Kestrel__Certificates__Default__Password=DevPassword123!
+      # Queue folders (bind-mounted so they are visible on the host)
+      - queue__queue_folder=/data/mail/queue
+      - queue__failed_folder=/data/mail/failed
+      - queue__mail_merge_queue_folder=/data/mail/merge
+      # Persist service logs (bind-mounted so they are visible on the host)
+      - FileLogging__Path=/data/logs
+      # Persist attachments and databases
+      - Attachments__Path=/data/attachments
+      - Attachments__IndexDbPath=/data/db/attachment_index.db
+      - mailforge__dispatcher__stateDbPath=/data/db/dispatcher_state.db
+      # IMPORTANT: JobWorkRoot is a path on the MailForge worker filesystem (container)
+      - mailforge__jobWorkRoot=/data/work
+      # OpenTelemetry export to SigNoz collector on host
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://host.docker.internal:4317
+      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+      # MailForge dispatcher (merge processing worker)
+      - mailforge__dispatcher__enabled=true
+      - mailforge__dispatcher__workerAddresses__0=https://mailforge:5003
+      # Local dev: MailForge uses a self-signed certificate that does not match the 'mailforge' hostname.
+      - mailforge__dispatcher__allowInvalidWorkerCertificates=true
+    ports:
+      - "5000:5000"
+      - "5001:5001"
+    volumes:
+      - ${MQNET_ROOT:-/home/kel/development/mqnet}/mail/queue:/data/mail/queue
+      - ${MQNET_ROOT:-/home/kel/development/mqnet}/mail/failed:/data/mail/failed
+      - ${MQNET_ROOT:-/home/kel/development/mqnet}/mail/merge:/data/mail/merge
+      - ${MQNET_ROOT:-/home/kel/development/mqnet}/Logs/mailqueueservice:/data/logs
+      - ${MQNET_ROOT:-/home/kel/development/mqnet}/config/mailqueueservice:/data/config
+      - ${MQNET_ROOT:-/home/kel/development/mqnet}/data/mailqueueservice/db:/data/db
+      - ${MQNET_ROOT:-/home/kel/development/mqnet}/data/mailqueueservice/attachments:/data/attachments
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-check-certificate -qO- https://localhost:5001/healthz || exit 1"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+    networks:
+      - mqnet
+    restart: unless-stopped
+
+  mailfunk:
+    container_name: mailfunk
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    build:
+      context: .
+      dockerfile: MailFunk/Dockerfile
+      args:
+        - CERT_PASSWORD=DevPassword123!
+        - ADMIN_CERT_PASSWORD=5752B93EAC30EEAC8B84FE
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      # Override the MailFunk config to point to the service by container DNS name
+      - MailService__BaseAddress=https://mailqueueservice:5001
+      # Allow MailFunk to call MailForge via container DNS (used by MailForge dashboard pages)
+      - MailForge__BaseAddress=https://mailforge:5003
+      # Bind UI on 8090 to avoid conflict with SigNoz UI on 8080
+      - ASPNETCORE_URLS=http://0.0.0.0:8090;https://0.0.0.0:8091
+      - ASPNETCORE_Kestrel__Certificates__Default__Path=/https/mailqueuenet.pfx
+      - ASPNETCORE_Kestrel__Certificates__Default__Password=DevPassword123!
+      # Persist UI logs (bind-mounted so they are visible on the host)
+      - FileLogging__Path=/data/logs
+      # Admin mTLS client cert used when calling admin gRPC endpoints
+      - AdminClientCert__Path=/https/admin-client.pfx
+      - AdminClientCert__Password=5752B93EAC30EEAC8B84FE
+      # OpenTelemetry export to SigNoz collector on host
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://host.docker.internal:4317
+      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+    ports:
+      - "8090:8090"
+      - "8091:8091"
+    volumes:
+      - ${MQNET_ROOT:-/home/kel/development/mqnet}/Logs/mailfunk:/data/logs
+    depends_on:
+      mailqueueservice:
+        condition: service_healthy
+      mailforge:
+        condition: service_started
+    networks:
+      - mqnet
+    restart: "no"
+
+  mailforge:
+    container_name: mailforge
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    build:
+      context: .
+      dockerfile: MailForge/Dockerfile
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      # Point MailForge at the queue service via container DNS
+      - MailQueue__Address=https://mailqueueservice:5001
+      - MailQueue__ClientId=MailForge
+      - MailQueue__SharedSecret=dev-shared-secret
+      # Persist merge batch JSONL output (bind-mounted so it is visible on the host)
+      - MAILFORGE_BATCH_FOLDER=/data/batches
+      - ASPNETCORE_URLS=http://0.0.0.0:5002;https://0.0.0.0:5003
+      - ASPNETCORE_Kestrel__Certificates__Default__Path=/https/mailqueuenet.pfx
+      - ASPNETCORE_Kestrel__Certificates__Default__Password=DevPassword123!
+      # Persist MailForge worker state
+      - mailforge__jobWorkRoot=/data/work
+      - MailForge__FenceDbPath=/data/db/dispatch_fence.db
+      - FileLogging__Path=/data/logs
+      # OpenTelemetry export to SigNoz collector on host
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://host.docker.internal:4317
+      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+    ports:
+      - "5002:5002"
+      - "5003:5003"
+    volumes:
+      - ${MQNET_ROOT:-/home/kel/development/mqnet}/data/mailforge/work:/data/work
+      - ${MQNET_ROOT:-/home/kel/development/mqnet}/data/mailforge/batches:/data/batches
+      - ${MQNET_ROOT:-/home/kel/development/mqnet}/data/mailforge/db:/data/db
+      - ${MQNET_ROOT:-/home/kel/development/mqnet}/Logs/mailforge:/data/logs
+      - ${MQNET_ROOT:-/home/kel/development/mqnet}/config/mailforge:/data/config
+    depends_on:
+      mailqueueservice:
+        condition: service_healthy
+    networks:
+      - mqnet
+    restart: "no"
+
+networks:
+  mqnet:
+    driver: bridge

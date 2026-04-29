@@ -1,31 +1,38 @@
-﻿using System;
-using System.IO;
-using System.Linq;
-using System.Net;
-using System.Net.Http;
-using System.Net.Mail;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
+﻿// <copyright file="Mailgun.cs" company="IBC Digital">
+//   Copyright (c) IBC Digital. All rights reserved.
+//
+//  Derived from “MailQueueNet” by Daniel Cohen Gindi
+//  (https://github.com/danielgindi/MailQueueNet).
+//
+//  Original portions:
+//    © 2014 Daniel Cohen Gindi (danielgindi@gmail.com)
+//    Licensed under the MIT Licence.
+//  Modifications and additions:
+//    © 2025 IBC Digital Pty Ltd
+//    Distributed under the same MIT Licence.
+//
+//  The above notice and this permission notice shall be included in
+//  all copies or substantial portions of this file.
+// </copyright>
 
 namespace MailQueueNet.Senders
 {
+    using System;
+    using System.IO;
+    using System.Linq;
+    using System.Net;
+    using System.Net.Http;
+    using System.Net.Mail;
+    using System.Text;
+    using System.Threading;
+    using System.Threading.Tasks;
+
     public class Mailgun : ISender
     {
-        private HttpClient s_HttpClient = new HttpClient(new HttpClientHandler { AllowAutoRedirect = true })
+        private HttpClient httpClient = new HttpClient(new HttpClientHandler { AllowAutoRedirect = true })
         {
-            Timeout = Timeout.InfiniteTimeSpan
+            Timeout = Timeout.InfiniteTimeSpan,
         };
-
-        private static string ComposeEmailDisplayAndAddress(string displayName, string address)
-        {
-            if (string.IsNullOrEmpty(displayName))
-                return address;
-
-            displayName = displayName.Replace("\\", "\\\\");
-
-            return string.Format("\"{0}\" <{1}>", displayName, address);
-        }
 
         public async Task<bool> SendMailAsync(MailMessage message, Grpc.MailSettings settings)
         {
@@ -74,9 +81,11 @@ namespace MailQueueNet.Senders
 
                 if (message.ReplyToList != null && message.ReplyToList.Count > 0)
                 {
-                    reqContent.Add(new StringContent(string.Join(",",
-                        message.ReplyToList.Select(x => ComposeEmailDisplayAndAddress(x.DisplayName, x.Address)))
-                    ), "h:Reply-To");
+                    reqContent.Add(
+                        new StringContent(string.Join(
+                        ",",
+                        message.ReplyToList.Select(x => ComposeEmailDisplayAndAddress(x.DisplayName, x.Address)))),
+                        "h:Reply-To");
                 }
 
                 foreach (var key in message.Headers.AllKeys)
@@ -89,7 +98,9 @@ namespace MailQueueNet.Senders
                             reqContent.Add(new StringContent(value), key);
                         }
                     }
-                    else if (key.StartsWith("Mailgun:")) // Any mailgun header to pass. "Mailgun:" will be stripped from the key.
+
+                    // Any mailgun header to pass. "Mailgun:" will be stripped from the key.
+                    else if (key.StartsWith("Mailgun:"))
                     {
                         var values = message.Headers.GetValues(key);
                         var keyPart = key.Remove(0, 8);
@@ -98,7 +109,9 @@ namespace MailQueueNet.Senders
                             reqContent.Add(new StringContent(value), keyPart);
                         }
                     }
-                    else if (key == "X-Mailgun-Tag") // Compatibility with SMTP api
+
+                    // Compatibility with SMTP api
+                    else if (key == "X-Mailgun-Tag")
                     {
                         var values = message.Headers.GetValues(key);
                         foreach (var value in values)
@@ -114,22 +127,32 @@ namespace MailQueueNet.Senders
                 if (!string.IsNullOrWhiteSpace(message.Body))
                 {
                     reqContent.Add(new StringContent(message.Body), message.IsBodyHtml ? "html" : "text");
-                    if (message.IsBodyHtml) hasHtmlBody = true;
-                    else hasTextBody = true;
+                    if (message.IsBodyHtml)
+                    {
+                        hasHtmlBody = true;
+                    }
+                    else
+                    {
+                        hasTextBody = true;
+                    }
                 }
 
                 if (!hasHtmlBody)
                 {
                     var content = message.AlternateViews.FirstOrDefault(x => x.ContentType.MediaType == "text/html");
                     if (content != null)
+                    {
                         reqContent.Add(new StreamContent(content.ContentStream), "html");
+                    }
                 }
 
                 if (!hasTextBody)
                 {
                     var content = message.AlternateViews.FirstOrDefault(x => x.ContentType.MediaType == "text/plain");
                     if (content != null)
+                    {
                         reqContent.Add(new StreamContent(content.ContentStream), "text");
+                    }
                 }
 
                 if (message.Attachments != null)
@@ -137,7 +160,10 @@ namespace MailQueueNet.Senders
                     foreach (var attachment in message.Attachments)
                     {
                         var fileStream = attachment.ContentStream as FileStream;
-                        if (fileStream == null) continue;
+                        if (fileStream == null)
+                        {
+                            continue;
+                        }
 
                         if (attachment.ContentDisposition.Inline)
                         {
@@ -163,7 +189,7 @@ namespace MailQueueNet.Senders
 
                     var timeout = mgSettings.ConnectionTimeout <= 0 ? 100000 : mgSettings.ConnectionTimeout;
                     using (var cancellationTokenSource = new CancellationTokenSource(TimeSpan.FromMilliseconds(timeout)))
-                    using (var resp = await s_HttpClient.SendAsync(req, cancellationTokenSource.Token).ConfigureAwait(false))
+                    using (var resp = await this.httpClient.SendAsync(req, cancellationTokenSource.Token).ConfigureAwait(false))
                     {
                         if (!resp.IsSuccessStatusCode)
                         {
@@ -172,13 +198,26 @@ namespace MailQueueNet.Senders
 
                         if (!resp.Content.Headers.ContentType.MediaType.StartsWith("application/json"))
                         {
-                            throw new WebException($"Invalid response returned from MailGun API: {(await resp.Content.ReadAsStringAsync().ConfigureAwait(false))}");
+                            throw new WebException($"Invalid response returned from MailGun API: {await resp.Content.ReadAsStringAsync().ConfigureAwait(false)}");
                         }
                     }
                 }
             }
 
-            return true; // Consumed it
+            // Consumed it
+            return true;
+        }
+
+        private static string ComposeEmailDisplayAndAddress(string displayName, string address)
+        {
+            if (string.IsNullOrEmpty(displayName))
+            {
+                return address;
+            }
+
+            displayName = displayName.Replace("\\", "\\\\");
+
+            return string.Format("\"{0}\" <{1}>", displayName, address);
         }
     }
 }

@@ -1,0 +1,190 @@
+@page "/mailforge"
+@using MailForge.Grpc
+
+<PageTitle>MailForge</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.False">
+    <div class="d-flex justify-space-between align-center mb-4 flex-wrap gap-4">
+        <MudText Typo="Typo.h5">MailForge</MudText>
+        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+            <MudDatePicker Date="@this.filterFrom" DateChanged="this.OnFilterFromChangedAsync" Label="From" Dense="true" />
+            <MudDatePicker Date="@this.filterTo" DateChanged="this.OnFilterToChangedAsync" Label="To" Dense="true" />
+            <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="this.ResetDateRange">Last 2 days</MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="this.RefreshAsync" Disabled="@this.refreshing">Refresh</MudButton>
+        </MudStack>
+    </div>
+
+    @if (this.loading)
+    {
+        <MudProgressCircular Indeterminate="true" />
+    }
+    else
+    {
+        <MudTable Items="this.jobs" Dense="true" Hover="true" RowStyleFunc="this.GetMergeRowStyle">
+            <HeaderContent>
+                <MudTh>Merge Id</MudTh>
+                <MudTh>Status</MudTh>
+                <MudTh>Client</MudTh>
+                <MudTh>Started (UTC)</MudTh>
+                <MudTh>Finished (UTC)</MudTh>
+                <MudTh align="right">Total</MudTh>
+                <MudTh align="right">Completed</MudTh>
+                <MudTh align="right">Failed</MudTh>
+                <MudTh align="right">Batches</MudTh>
+                <MudTh></MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Merge Id">
+                    <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="@(() => this.SelectMergeAsync(context))">@context.MergeId</MudButton>
+                </MudTd>
+                <MudTd DataLabel="Status">@context.Status</MudTd>
+                <MudTd DataLabel="Client">@context.ClientId</MudTd>
+                <MudTd DataLabel="Started (UTC)">@context.StartedUtc</MudTd>
+                <MudTd DataLabel="Finished (UTC)">@context.FinishedUtc</MudTd>
+                <MudTd DataLabel="Total" Align="Right">@context.TotalRows</MudTd>
+                <MudTd DataLabel="Completed" Align="Right">@context.CompletedRows</MudTd>
+                <MudTd DataLabel="Failed" Align="Right">@context.FailedRows</MudTd>
+                <MudTd DataLabel="Batches" Align="Right">@context.BatchCount</MudTd>
+                <MudTd>
+                    <MudLink Href="@($"mailforge/{context.MergeId}")">Details</MudLink>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+
+        <MudPaper Class="pa-3 mt-4" Elevation="1">
+            <MudText Typo="Typo.h6">Preview</MudText>
+
+            @if (this.previewBusy)
+            {
+                <MudProgressCircular Indeterminate="true" Size="Size.Small" Class="mt-2" />
+            }
+            else if (!string.IsNullOrWhiteSpace(this.previewError))
+            {
+                <MudAlert Severity="Severity.Error" Class="mt-2">@this.previewError</MudAlert>
+            }
+            else if (this.selectedDetail == null)
+            {
+                <MudText Typo="Typo.body2" Class="mt-2">Select a merge above to preview its template and merge rows.</MudText>
+            }
+            else
+            {
+                <MudGrid Class="mt-2">
+                    <MudItem xs="12">
+                        <MudPaper Class="pa-3 mb-3" Elevation="0">
+                            <MudText Typo="Typo.subtitle1">Merge summary</MudText>
+                            <MudGrid Class="mt-2">
+                                <MudItem xs="12" md="3"><MudText Typo="Typo.body2">Merge Id</MudText><MudText Typo="Typo.h6">@this.selectedDetail.Summary?.MergeId</MudText></MudItem>
+                                <MudItem xs="12" md="3"><MudText Typo="Typo.body2">Status</MudText><MudText Typo="Typo.h6">@this.selectedDetail.Summary?.Status</MudText></MudItem>
+                                <MudItem xs="12" md="3"><MudText Typo="Typo.body2">Client</MudText><MudText Typo="Typo.h6">@this.selectedDetail.Summary?.ClientId</MudText></MudItem>
+                                <MudItem xs="12" md="3"><MudText Typo="Typo.body2">Progress</MudText><MudText Typo="Typo.h6">@this.selectedDetail.PercentComplete%</MudText></MudItem>
+
+                                <MudItem xs="12" md="3"><MudText Typo="Typo.body2">Started (UTC)</MudText><MudText Typo="Typo.body1">@this.selectedDetail.Summary?.StartedUtc</MudText></MudItem>
+                                <MudItem xs="12" md="3"><MudText Typo="Typo.body2">Finished (UTC)</MudText><MudText Typo="Typo.body1">@this.selectedDetail.Summary?.FinishedUtc</MudText></MudItem>
+                                <MudItem xs="12" md="3"><MudText Typo="Typo.body2">Rows</MudText><MudText Typo="Typo.body1">@this.selectedDetail.Summary?.CompletedRows/@this.selectedDetail.Summary?.TotalRows</MudText></MudItem>
+                                <MudItem xs="12" md="3"><MudText Typo="Typo.body2">Failed</MudText><MudText Typo="Typo.body1">@this.selectedDetail.Summary?.FailedRows</MudText></MudItem>
+
+                                @if (!string.IsNullOrWhiteSpace(this.selectedDetail.Summary?.LastError))
+                                {
+                                    <MudItem xs="12">
+                                        <MudText Typo="Typo.body2">Last error</MudText>
+                                        <MudText Typo="Typo.body2" Style="white-space:pre-wrap;">@this.selectedDetail.Summary.LastError</MudText>
+                                    </MudItem>
+                                }
+                            </MudGrid>
+                        </MudPaper>
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudText Typo="Typo.subtitle1">Template</MudText>
+                        <MudText Typo="Typo.body2"><b>Subject:</b> @this.selectedDetail.Template?.Message?.Subject</MudText>
+                        <MudText Typo="Typo.body2" Class="mt-2"><b>Body:</b></MudText>
+                        <MudPaper Class="pa-2 mt-1" Elevation="0" Style="max-height: 300px; overflow:auto; white-space:pre-wrap;">@this.selectedDetail.Template?.Message?.Body</MudPaper>
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <div class="d-flex justify-space-between align-center flex-wrap gap-2">
+                            <MudText Typo="Typo.subtitle1">Merge rows</MudText>
+                            @if (this.batchOptions.Count > 0)
+                            {
+                                <MudSelect T="int" Value="@this.selectedBatchId" ValueChanged="this.OnSelectedBatchChangedAsync" Dense="true" Label="Batch">
+                                    @foreach (var batchId in this.batchOptions)
+                                    {
+                                        <MudSelectItem T="int" Value="@batchId">@batchId</MudSelectItem>
+                                    }
+                                </MudSelect>
+                            }
+                        </div>
+
+                        <MudTabs Rounded="true" Class="mt-2">
+                            <MudTabPanel Text="Formatted">
+                                <MudPaper Class="pa-2" Elevation="0" Style="max-height: 300px; overflow:auto;">
+                                    @if (this.batchPreviewTableRows.Count > 0)
+                                    {
+                                        <MudTable T="Dictionary<string, string>" Items="this.batchPreviewTableRows" Dense="true" Hover="true">
+                                            <HeaderContent>
+                                                @foreach (var col in this.batchPreviewColumns)
+                                                {
+                                                    <MudTh>@col</MudTh>
+                                                }
+                                            </HeaderContent>
+                                            <RowTemplate>
+                                                @foreach (var col in this.batchPreviewColumns)
+                                                {
+                                                    <MudTd>
+                                                        @if (context.TryGetValue(col, out var v))
+                                                        {
+                                                            @v
+                                                        }
+                                                    </MudTd>
+                                                }
+                                            </RowTemplate>
+                                        </MudTable>
+                                    }
+                                    else if (this.batchPreviewTreeRoots.Count > 0)
+                                    {
+                                        <JsonTreeView Nodes="this.batchPreviewTreeRoots" />
+                                    }
+                                    else
+                                    {
+                                        <MudText Typo="Typo.body2">No merge rows available for this batch.</MudText>
+                                    }
+                                </MudPaper>
+                            </MudTabPanel>
+                            <MudTabPanel Text="Raw">
+                                <MudPaper Class="pa-2" Elevation="0" Style="max-height: 300px; overflow:auto; white-space:pre; font-family: monospace;">@this.batchPreviewRaw</MudPaper>
+                            </MudTabPanel>
+                        </MudTabs>
+
+                        @if (this.selectedDetail.Batches?.Count > 0)
+                        {
+                            <MudText Typo="Typo.subtitle2" Class="mt-3">Batches</MudText>
+                            <MudTable Items="this.selectedDetail.Batches" Dense="true" Hover="true" Class="mt-2">
+                                <HeaderContent>
+                                    <MudTh align="right">Batch</MudTh>
+                                    <MudTh>Status</MudTh>
+                                    <MudTh align="right">Total</MudTh>
+                                    <MudTh align="right">Completed</MudTh>
+                                    <MudTh align="right">Failed</MudTh>
+                                    <MudTh>Updated (UTC)</MudTh>
+                                </HeaderContent>
+                                <RowTemplate>
+                                    <MudTd DataLabel="Batch" Align="Right">@context.BatchId</MudTd>
+                                    <MudTd DataLabel="Status">@context.Status</MudTd>
+                                    <MudTd DataLabel="Total" Align="Right">@context.TotalRows</MudTd>
+                                    <MudTd DataLabel="Completed" Align="Right">@context.CompletedRows</MudTd>
+                                    <MudTd DataLabel="Failed" Align="Right">@context.FailedRows</MudTd>
+                                    <MudTd DataLabel="Updated (UTC)">@context.UpdatedUtc</MudTd>
+                                </RowTemplate>
+                            </MudTable>
+                        }
+                    </MudItem>
+                </MudGrid>
+            }
+        </MudPaper>
+
+        @if (!string.IsNullOrWhiteSpace(this.error))
+        {
+            <MudAlert Severity="Severity.Error" Class="mt-4">@this.error</MudAlert>
+        }
+    }
+</MudContainer>
