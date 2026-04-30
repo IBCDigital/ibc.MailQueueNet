@@ -1,0 +1,49 @@
+services:
+  mailqueuenet-service:
+    container_name: mailqueuenet-service
+    image: docker-hub.internal.ibc.com.au/mailqueuenet-service:latest
+    restart: unless-stopped
+    env_file:
+      - ./app/mailqueuenet-service/.env
+    networks:
+      - mailqueuenet_stack
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./app/mailqueuenet-service/data:/data
+
+  mailforge:
+    container_name: mailforge
+    image: docker-hub.internal.ibc.com.au/mailforge:latest
+    restart: unless-stopped
+    depends_on:
+      - mailqueuenet-service
+    env_file:
+      - ./app/mailforge/.env
+    networks:
+      - mailqueuenet_stack
+    expose:
+      - "5002"
+    volumes:
+      - ./app/mailforge/data:/data
+
+  mailfunk:
+    container_name: mailfunk
+    image: docker-hub.internal.ibc.com.au/mailfunk:latest
+    restart: unless-stopped
+    depends_on:
+      - mailqueuenet-service
+      - mailforge
+    env_file:
+      - ./app/mailfunk/.env
+    networks:
+      - mailqueuenet_stack
+    ports:
+      - "5002:5004"
+    volumes:
+      - ./app/mailfunk/data:/data  # Data Protection keys for stable OIDC cookie/state handling
+
+networks:
+  mailqueuenet_stack:
+    name: mailqueuenet_stack
+    driver: bridge
