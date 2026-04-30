@@ -60,6 +60,7 @@ namespace MailQueueNet.Service
                 .ConfigureLogging((ctx, logging) =>
                 {
                     MailQueueNetLogger.ConfigureFrom(ctx.Configuration);
+                    logging.AddProvider(new MailQueueNetLoggerProvider());
                 })
                 .UseConsoleLifetime()
 #if Linux || Portable

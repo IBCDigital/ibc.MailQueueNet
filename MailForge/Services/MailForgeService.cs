@@ -36,8 +36,6 @@ namespace MailForge.Services
         private const string FenceDbDefaultFileName = "dispatch_fence.db";
 
         private const string DefaultLogFolder = "/data/logs";
-        private const string LogFileSearchPattern = "mailforge_*.txt";
-
         private const int DefaultTailBytes = 128 * 1024;
         private const int MaxTailBytes = 2 * 1024 * 1024;
 
@@ -443,7 +441,8 @@ namespace MailForge.Services
                 }
 
                 var files = Directory
-                    .GetFiles(baseFolder, LogFileSearchPattern)
+                    .GetFiles(baseFolder, "*.*")
+                    .Where(this.IsSupportedLogFile)
                     .Select(f => new FileInfo(f))
                     .OrderByDescending(f => f.LastWriteTimeUtc)
                     .Select(f => new LogFileInfo
@@ -586,7 +585,7 @@ namespace MailForge.Services
 
         private string ResolveLogBaseFolder()
         {
-            var configuredPath = this.configuration["FileLogging:Path"];
+            var configuredPath = this.configuration["LoggingSettings:LogFilesFolder"];
             if (string.IsNullOrWhiteSpace(configuredPath))
             {
                 return DefaultLogFolder;
@@ -599,6 +598,18 @@ namespace MailForge.Services
 
             var basePath = this.env.ContentRootPath ?? AppContext.BaseDirectory;
             return Path.Combine(basePath, configuredPath);
+        }
+
+        private bool IsSupportedLogFile(string path)
+        {
+            var name = Path.GetFileName(path);
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return false;
+            }
+
+            return name.EndsWith(".log", StringComparison.OrdinalIgnoreCase)
+                || name.EndsWith(".txt", StringComparison.OrdinalIgnoreCase);
         }
 
         private string? TryResolveLogPath(string name)

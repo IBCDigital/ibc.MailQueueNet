@@ -75,5 +75,6 @@
     <PackageReference Include="IBC.Logging">
       <Version>3.0.14</Version>
     </PackageReference>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.11" />
   </ItemGroup>
 </Project>

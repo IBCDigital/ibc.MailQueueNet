@@ -80,7 +80,11 @@ namespace MailFunk.Components.Pages
                 var path = this.ResolveMailFunkLogsFolder();
                 try
                 {
-                    this.mfFiles = Directory.GetFiles(path, "log_*.txt").Select(Path.GetFileName).OrderByDescending(x => x).ToArray();
+                    this.mfFiles = Directory.GetFiles(path, "*.*")
+                        .Where(this.IsSupportedLogFile)
+                        .Select(Path.GetFileName)
+                        .OrderByDescending(x => x)
+                        .ToArray();
                 }
                 catch
                 {
@@ -248,8 +252,7 @@ namespace MailFunk.Components.Pages
 
         private string ResolveMailFunkLogsFolder()
         {
-            var section = this.Config.GetSection("FileLogging");
-            var configuredPath = section["Path"];
+            var configuredPath = this.Config["LoggingSettings:LogFilesFolder"];
             var basePath = this.Env.ContentRootPath ?? AppContext.BaseDirectory;
             if (string.IsNullOrWhiteSpace(configuredPath))
             {
@@ -257,6 +260,18 @@ namespace MailFunk.Components.Pages
             }
 
             return Path.IsPathRooted(configuredPath) ? configuredPath : Path.Combine(basePath, configuredPath);
+        }
+
+        private bool IsSupportedLogFile(string path)
+        {
+            var name = Path.GetFileName(path);
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return false;
+            }
+
+            return name.EndsWith(".log", StringComparison.OrdinalIgnoreCase)
+                || name.EndsWith(".txt", StringComparison.OrdinalIgnoreCase);
         }
 
         private void SetupTimer()

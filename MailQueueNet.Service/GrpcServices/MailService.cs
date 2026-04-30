@@ -552,7 +552,7 @@ namespace MailQueueNet.Service.GrpcServices
             }
 
             var di = new DirectoryInfo(baseFolder);
-            var files = di.GetFiles("*.txt").Where(f => f.Name.StartsWith("log_") || f.Name.StartsWith("service_") || f.Name.StartsWith("admin_") || f.Name.StartsWith("mailreq_") || f.Name.StartsWith("sent_") || f.Name.StartsWith("failed_")).OrderByDescending(f => f.LastWriteTimeUtc).Select(f => new Grpc.LogFileInfo
+            var files = di.GetFiles("*.*").Where(f => this.IsSupportedLogFile(f.Name)).OrderByDescending(f => f.LastWriteTimeUtc).Select(f => new Grpc.LogFileInfo
             {
                 Name = f.Name,
                 Size = f.Length,
@@ -1892,8 +1892,7 @@ namespace MailQueueNet.Service.GrpcServices
 
         private string ResolveLogsFolder()
         {
-            var section = this.configuration.GetSection("FileLogging");
-            var configured = section["Path"];
+            var configured = this.configuration["LoggingSettings:LogFilesFolder"];
             var root = this.env.ContentRootPath ?? AppContext.BaseDirectory;
             if (string.IsNullOrWhiteSpace(configured))
             {
@@ -1901,6 +1900,17 @@ namespace MailQueueNet.Service.GrpcServices
             }
 
             return Path.IsPathRooted(configured) ? configured : Path.Combine(root, configured);
+        }
+
+        private bool IsSupportedLogFile(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return false;
+            }
+
+            return name.EndsWith(".log", StringComparison.OrdinalIgnoreCase)
+                || name.EndsWith(".txt", StringComparison.OrdinalIgnoreCase);
         }
 
         private async Task<FileStream> OpenForReadWithRetryAsync(string path, long position, CancellationToken ct)

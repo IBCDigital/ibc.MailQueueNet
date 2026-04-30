@@ -174,6 +174,7 @@ namespace MailForge
         private static void ConfigureLogging(WebApplicationBuilder builder)
         {
             MailQueueNetLogger.ConfigureFrom(builder.Configuration);
+            builder.Logging.AddProvider(new MailQueueNetLoggerProvider());
             builder.Logging.SetMinimumLevel(LogLevel.Information);
         }
 
