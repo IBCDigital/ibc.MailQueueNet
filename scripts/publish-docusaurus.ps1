@@ -60,6 +60,18 @@ function Invoke-Native
     Assert-LastExitCode $FilePath
 }
 
+function Invoke-RemoteBash
+{
+    param (
+        [Parameter(Mandatory = $true)]
+        [string]$Script
+    )
+
+    $normalisedScript = $Script -replace "`r`n", "`n" -replace "`r", "`n"
+    $normalisedScript | & ssh @sshArguments $remote 'bash -se'
+    Assert-LastExitCode 'ssh'
+}
+
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..')
 $docsSitePath = Join-Path $repoRoot 'docs-site'
 $buildDocsScriptPath = Join-Path $PSScriptRoot 'build-docs.ps1'
@@ -72,7 +84,7 @@ $releaseParent = "$RemoteRoot/.releases/$SitePath"
 $livePath = "$RemoteRoot/$SitePath"
 $remote = "$SshUser@$SshHost"
 $sshArguments = @('-i', $resolvedSshKeyPath, '-o', 'IdentitiesOnly=yes', '-p', $SshPort.ToString())
-$scpArguments = @('-i', $resolvedSshKeyPath, '-o', 'IdentitiesOnly=yes', '-P', $SshPort.ToString())
+$scpArguments = @('-O', '-i', $resolvedSshKeyPath, '-o', 'IdentitiesOnly=yes', '-P', $SshPort.ToString())
 $publicUrl = "$PublicBaseUrl/$SitePath/"
 $releasePruneStart = [int]($KeepReleases + 1)
 
@@ -108,7 +120,7 @@ mkdir -p '$incomingParent' '$releaseParent'
 rm -rf '$incomingStamp'
 mkdir -p '$incomingStamp'
 "@
-    Invoke-Native ssh @sshArguments $remote $prepareScript
+    Invoke-RemoteBash $prepareScript
 
     Write-Host 'Uploading built site to the remote staging area...' -ForegroundColor Cyan
     Invoke-Native scp @scpArguments -r $buildDir "${remote}:$incomingStamp/"
@@ -119,14 +131,19 @@ set -eu
 REMOTE_ROOT='__REMOTE_ROOT__'
 SITE='__SITE__'
 STAMP='__STAMP__'
-INCOMING="$REMOTE_ROOT/.incoming/$SITE/$STAMP/build"
+INCOMING_PARENT="$REMOTE_ROOT/.incoming/$SITE/$STAMP"
+INCOMING="$INCOMING_PARENT/build"
 RELEASE_PARENT="$REMOTE_ROOT/.releases/$SITE"
 RELEASE_DIR="$RELEASE_PARENT/$STAMP"
 LIVE_PATH="$REMOTE_ROOT/$SITE"
 TEMP_LINK="$REMOTE_ROOT/.$SITE.current"
 
-if [ ! -d "$INCOMING" ]; then
-  echo "Incoming build folder not found: $INCOMING" >&2
+if [ ! -f "$INCOMING/index.html" ] && [ -f "$INCOMING_PARENT/index.html" ]; then
+  INCOMING="$INCOMING_PARENT"
+fi
+
+if [ ! -f "$INCOMING/index.html" ]; then
+  echo "Incoming Docusaurus output not found under: $INCOMING_PARENT" >&2
   exit 1
 fi
 
@@ -147,7 +164,7 @@ ls -1dt "$RELEASE_PARENT"/* 2>/dev/null | tail -n +__PRUNE_START__ | xargs -r rm
     $finalizeScript = $finalizeScript.Replace('__SITE__', $SitePath)
     $finalizeScript = $finalizeScript.Replace('__STAMP__', $stamp)
     $finalizeScript = $finalizeScript.Replace('__PRUNE_START__', $releasePruneStart.ToString())
-    Invoke-Native ssh @sshArguments $remote $finalizeScript
+    Invoke-RemoteBash $finalizeScript
 
     Write-Host "Published successfully: $publicUrl" -ForegroundColor Green
     Write-Host "Live path on server: $livePath" -ForegroundColor Green
