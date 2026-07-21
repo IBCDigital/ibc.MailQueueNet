@@ -50,6 +50,8 @@ namespace MailQueueNet.Grpc
             private static string? sharedSecret;
             private static string? clientId;
 
+            internal static string? ConfiguredClientId => clientId;
+
             private const string AttachmentTokenHeader = "X-Attachment-Token";
             private const string AttachmentTokenFileNameHeader = "X-Attachment-Token-FileName";
             private const string AttachmentTokenContentTypeHeader = "X-Attachment-Token-ContentType";

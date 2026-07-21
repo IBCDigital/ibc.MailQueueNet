@@ -7,6 +7,8 @@ services:
       - ./app/mailqueuenet-service/.env
     networks:
       - mailqueuenet_stack
+    extra_hosts:
+      - "mail.ibc.com.au:172.1.32.232"
     ports:
       - "5000:5000"
     volumes:

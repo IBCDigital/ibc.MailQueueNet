@@ -43,6 +43,8 @@ running output.txt
 
 # Local troubleshooting artefacts
 dev-resources/*.har
+dev-resources/remote access/
+dev-resources/remote access/**
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs

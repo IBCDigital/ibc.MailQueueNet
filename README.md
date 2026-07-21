@@ -1,46 +1,130 @@
-“This fork extends MailQueueNet and retains its original MIT licence.”
+This fork extends MailQueueNet and retains its original MIT licence.
 
-MailQueueNet
-================
+# MailQueueNet
 
-This is a .NET Core service that queues .NET's `MailMessage` objects to go out in the background, 
-so you can prevent blocking your app when sending those out.  
-The messages are queued and serialized on disk for resiliency.
+MailQueueNet is a .NET 9 mail queueing and mail merge stack. It queues .NET `MailMessage` objects for background delivery, serialises queued work for resilience, and includes supporting services for merge processing and operator administration.
 
-The project has been migrated to `.NET Standard` and a `.NET Core 5` service. Which also makes it multiplatform.  
-The name has changed to `MailQueueNet`.
+## Projects
 
-## Service Installation:
-* Publish `MailQueueNet.Service` from code for your target machine, or take binaries from the `Releases` section.
-* Install the service (preferrably) on the same machine. Note that file attachments are only supported on the same machine, as only file paths are serialized and not the data. This may change or be configurable in the future.
-* For installing a Windows service, use `sc create MailQueueNet BinPath=C:\full\path\service\MailQueueNet.Service.exe`. (You can use `sc delete MailQueueNet`) to uninstall.
-* For installing a Linux service, you can follow the instructions in `MailQueueNet.systemd.service` file that comes with the package.
-* Create a folder for queued and failed emails, with sufficient permissions. By default the service will look for "./mail/queue" and "./mail/failed" in the exe's folder.
-* Now you can define basic configurations in `appsettings.json`, or do them later from code.
-* On Windows, if you get an *0x80131515* error, then go to the properties of the *MailQueueNet.Service.exe*, and click on "Unblock". (Windows Server may recognized that the file was downloaded, and block it automatically).
-* On Windows, use `net start MailQueueNet` to start the service, or go to Services in Computer Management.
-* On Linux, use `sudo service start MailQueueNet` to start the service.
-* You can also run the service as a cli program, without installing as a service.
+- `MailQueueNet.Service` — gRPC queue service for normal mail, bulk mail, attachments, and mail merge coordination.
+- `MailForge` — mail merge worker that renders merge templates and queues generated recipient messages.
+- `MailFunk` — Blazor operator/admin UI.
+- `MailQueueNet.Common` — shared gRPC contracts and .NET client helpers.
+- `MailQueueNet.Core` — core sender abstractions and delivery implementations.
 
-## Usage as a queuing service:
-* Install `MailQueueNet.Common` package from Nuget in your project
-* Do this:
-```c# 
-var mailChannel = GrpcChannel.ForAddress("https://localhost:5001", new GrpcChannelOptions {
-    // .NET Core: HttpHandler = new HttpClientHandler { /* allow self-signed certs ServerCertificateCustomValidationCallback = (e, c, ch, errs) => true */ },
-    // Windows/.NET 4.7.2: HttpHandler = new WinHttpHandler { /* allow self-signed certs ServerCertificateValidationCallback = (e, c, ch, errs) => true */ },
-});
+## Local build
+
+```powershell
+dotnet build .\MailQueueNet.sln -c Release
+```
+
+Dockerfiles are provided for the deployed services:
+
+- `MailQueueNet.Service/Dockerfile`
+- `MailForge/Dockerfile`
+- `MailFunk/Dockerfile`
+
+## Deployment folders
+
+Deployment templates and helper scripts live under `deploy/`:
+
+- Staging: `deploy/staging/mailqueuenet-stack/`
+- Production: `deploy/production/mailqueuenet-stack/`
+
+Each deployment folder contains its own README with environment-specific instructions:
+
+- `deploy/staging/mailqueuenet-stack/README.md`
+- `deploy/production/mailqueuenet-stack/README.md`
+
+Persistent app data and per-service environment files are under each deployment stack's `app/` folder. The deployment layout mirrors the server path:
+
+```text
+/wwwroot/wwwdocs/mailqueuenet-stack
+```
+
+## Environment files
+
+Environment files are intentionally not committed with secrets. Copy the matching `.env.example` files to `.env` and fill in the deployment-specific values.
+
+Staging examples:
+
+- `deploy/staging/mailqueuenet-stack/app/mailqueuenet-service/.env.example`
+- `deploy/staging/mailqueuenet-stack/app/mailforge/.env.example`
+- `deploy/staging/mailqueuenet-stack/app/mailfunk/.env.example`
+- `deploy/staging/mailqueuenet-stack/app/scripts/.env.example`
+
+Production examples:
+
+- `deploy/production/mailqueuenet-stack/app/mailqueuenet-service/.env.example`
+- `deploy/production/mailqueuenet-stack/app/mailforge/.env.example`
+- `deploy/production/mailqueuenet-stack/app/mailfunk/.env.example`
+- `deploy/production/mailqueuenet-stack/app/scripts/.env.example`
+
+The script `.env` file controls deployment helper defaults such as server name, remote path, Docker registry, tag, and registry credentials.
+
+## Docker image publishing
+
+The image push scripts build and push the stack images to the configured registry:
+
+- `mailqueuenet-service`
+- `mailforge`
+- `mailfunk`
+
+Staging:
+
+```powershell
+.\deploy\staging\mailqueuenet-stack\app\scripts\push-images-to-registry.ps1
+```
+
+Production:
+
+```powershell
+.\deploy\production\mailqueuenet-stack\app\scripts\push-images-to-registry.ps1
+```
+
+Defaults are read from the relevant `app/scripts/.env`. The default internal registry is:
+
+```text
+docker-hub.internal.ibc.com.au
+```
+
+To build and push only the MailForge image manually:
+
+```powershell
+docker build --progress=plain --file .\MailForge\Dockerfile --tag docker-hub.internal.ibc.com.au/mailforge:latest .
+docker push docker-hub.internal.ibc.com.au/mailforge:latest
+```
+
+## Updating a deployed MailForge container
+
+After pushing a new `mailforge` image, update the target server from the deployed stack folder:
+
+```sh
+cd /wwwroot/wwwdocs/mailqueuenet-stack
+docker compose pull mailforge
+docker compose up -d --no-deps mailforge
+docker logs --tail 100 mailforge
+```
+
+Alternatively, use the deployment helper scripts:
+
+- Staging: `deploy/staging/mailqueuenet-stack/app/scripts/compose-up.ps1`
+- Production: `deploy/production/mailqueuenet-stack/app/scripts/compose-up.ps1`
+
+## Usage as a queuing service
+
+Install/reference `MailQueueNet.Common` in your client project and create a gRPC client:
+
+```csharp
+var mailChannel = GrpcChannel.ForAddress("https://localhost:5001");
 var mailClient = new MailQueueNet.Grpc.MailGrpcService.MailGrpcServiceClient(mailChannel);
 ```
-* Then use `mailClient` to add mails to the queue, or update the settings of the service on the fly.
 
-## Usage as a library:
-* It's possible to directly reference `MailQueueNet.Core` and use `SenderFactory` to send out mails without the queuing service, to both SMTP and Mailgun API (or any other service that may be supported in the future).
+Use the generated client and common helper APIs to add mail to the queue, send bulk mail, manage attachments, or queue mail merge templates.
 
-## Me
-* Hi! I am Daniel.
-* danielgindi@gmail.com is my email address.
-* That's all you need to know.
+## Usage as a library
+
+You can directly reference `MailQueueNet.Core` and use `SenderFactory` to send mail without the queue service.
 
 ## License
 

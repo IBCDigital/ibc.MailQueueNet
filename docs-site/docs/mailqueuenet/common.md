@@ -181,10 +181,33 @@ await resilientClient.QueueMailWithRetryAndResilienceAsync(message);
 When disk resilience is enabled:
 
 1. The client performs gRPC retries (Polly `WaitAndRetryAsync`) for transient errors.
-2. If queueing still fails, the message is written to disk as a `*.mail` file in `UndeliveredFolder`.
-3. A background timer periodically scans the folder and attempts to resend using the same configured client authentication headers.
-4. When a resend succeeds, the `*.mail` file is deleted.
-5. If some items remain unsent (for example they are older than `ResendWindowHours`), the client can send an alert email (if SMTP settings are configured).
+2. If queueing still fails, the message is written to disk in `UndeliveredFolder` using a two-phase write.
+3. The client writes the complete protobuf message to a same-folder temporary file named like `*.mail.writing-*.tmp`, flushes it to storage, closes the stream, then publishes it with a same-directory move to the final `*.mail` name.
+4. A background timer periodically scans only final `*.mail` files and attempts to resend using the same configured client authentication headers.
+5. When a resend succeeds, the `*.mail` file is deleted.
+6. If some items remain unsent (for example they are older than `ResendWindowHours`), the client can send an alert email (if SMTP settings are configured).
+
+Temporary files are not resendable mail. Normal resend scans ignore `*.mail.writing-*.tmp`, `*.tmp`, and any non-final extension. If a process is terminated during a write, an abandoned temporary file may remain, but it is not parsed or resent by the normal retry loop. Only completed final `*.mail` files are treated as retry candidates.
+
+### Shared resend lock behaviour
+
+When multiple clients share one `UndeliveredFolder`, the resend loop uses the configured lock file, `LockFileName` (`.resend.lock` by default), to prevent duplicate concurrent resend processing. The lock file is created in the same folder as the retry files and is held with an exclusive file handle for the full resend loop.
+
+When a client acquires the lock it writes safe operational metadata to the lock file:
+
+```plaintext
+owner={client-or-node-id}
+processId={process-id}
+createdUtc={round-trip-utc}
+expiresUtc={round-trip-utc}
+package=MailQueueNet
+state={active-or-released}
+releasedUtc={round-trip-utc-if-released}
+```
+
+The metadata is for health checks and operational diagnostics only. It must not contain mail payload data, recipient addresses, subjects, message bodies, attachment names, SMTP credentials, shared secrets, or serialized mail content.
+
+If another active owner holds `.resend.lock`, the client skips the resend loop and leaves pending final `*.mail` files untouched. This is expected in multi-node deployments and does not mean the retry files are corrupt. The owning client renews `expiresUtc` while it still holds the lock. If stale metadata exists but exclusive access cannot be acquired safely, MailQueueNet leaves the lock file untouched and skips processing rather than risking duplicate resend. If the owner process terminates and the shared filesystem releases the handle, another client can acquire the lock, replace the metadata, and continue processing.
 
 ### Graceful shutdown behaviour
 
@@ -229,8 +252,23 @@ Expected semantics:
 
 - Put `UndeliveredFolder` on **durable storage**.
 - In multi-instance deployments, use a **shared folder** so one node can drain the backlog when connectivity returns.
+- The temporary write file is created in the same folder as the final `*.mail` file so publication stays on one filesystem mount.
+- Do not treat `*.mail.writing-*.tmp` files as pending mail in health checks or operations dashboards. Report only final `*.mail` files as resendable backlog.
+- Health checks may read `.resend.lock` metadata to report owner, active or released state, lock age, expiry, and access failures. If the file cannot be read while another process owns it, report the lock state as unknown/active rather than deleting or modifying it.
 - The resend loop is designed for **at-least-once** behaviour. In rare cases (for example, a network failure after the server accepted the request but before the client received the reply) a resend can create duplicates.
   - If you need strong deduplication, introduce an application-level message id (for example in a custom header) and have your downstream process treat it as an idempotency key.
+- Logs and health checks should use file metadata only. Do not log retry message content, recipient addresses, or other mail payload data.
+
+### Shared-folder verification checklist
+
+After publishing a hardened `MailQueueNet.Common` package and before updating consuming applications, verify the target shared retry volume:
+
+1. Start two clients against the same `UndeliveredFolder` and force both resend loops to start at the same time.
+2. Confirm exactly one client processes the current final `*.mail` backlog.
+3. Confirm the second client observes an active `.resend.lock`, skips resend, and leaves final `*.mail` files untouched.
+4. Kill or terminate the lock owner during resend and confirm another client can recover after the OS/shared filesystem releases the handle or after the configured timeout.
+5. Confirm retry health reports lock existence, owner, active/stale or unknown state, lock age, expiry, and access failures using metadata only.
+6. Repeat the verification on the Linux-based Docker volume used by the deployment, for example `/var/lib/flockwork/mail-retry`.
 
 ## Configuration via `appsettings.json` (NET 9)
 

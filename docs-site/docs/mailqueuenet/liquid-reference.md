@@ -96,6 +96,33 @@ Your plan is: {{ Account.Plan }}.
 If you need help, reply to this email.
 ```
 
+## Address header templates
+
+MailForge renders Liquid tokens in the mail merge template subject, body, and address headers for each JSON row. The following address fields can contain row tokens:
+
+- `From`
+- `Sender`
+- `Reply-To`
+- `Cc`
+- `Bcc`
+
+The recipient `To` address still comes from the row `Email` field.
+
+Example JSONL rows with a per-recipient reply address:
+
+```json
+{"Email":"shane@ibc.com.au","ReplyTo":"foxev.ghy.zddueoh.frp.bz7.lq@s-mc.waarble.com","RecipientUserId":"914","RecipientName":"Bill Purser"}
+{"Email":"shane@ibc.com.au","ReplyTo":"foxev.ghy.zddueoh.frp.bz7.b17@s-mc.waarble.com","RecipientUserId":"1328","RecipientName":"J Parker"}
+```
+
+Set the template `Reply-To` address to:
+
+```liquid
+{{ ReplyTo }}
+```
+
+When using the common .NET client, set this through `System.Net.Mail.MailMessage.ReplyToList`. The common protobuf conversion maps `ReplyToList` to the built-in `replyTo` field, and MailForge renders that field for every generated recipient message.
+
 ## Notes for operators
 
 - Liquid vs Handlebars selection is controlled by the merge template header `X-MailMerge-Engine`.

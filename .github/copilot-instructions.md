@@ -335,6 +335,7 @@ To enforce some of the above automatically, consider these settings in your `sty
 
 - For the staging-only mail-routing allow-list feature, clients should manage their own lists using **client shared-secret authentication** rather than **admin authentication**. However, MailFunk should also be able to manage any client's list using admin credentials.
 - Real SMTP deliveries should include a **subject marker**.
+- **Do not add or support client-specific mail merge headers** such as Waarble-specific custom headers; use product-standard MailQueueNet fields and APIs instead.
 
 ---
 

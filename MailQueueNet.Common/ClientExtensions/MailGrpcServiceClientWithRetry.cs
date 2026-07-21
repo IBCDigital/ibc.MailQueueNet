@@ -110,7 +110,9 @@ namespace MailQueueNet.Grpc
             // shared lock file.
             this.fileLock = new FileResendLock(
                 config.UndeliveredFolder,
-                config.LockFileName);
+                config.LockFileName,
+                TimeSpan.FromSeconds(Math.Max(1, config.DistributedLockTimeoutSeconds)),
+                CreateResendLockOwnerId());
 
             // (Re)start timer.
             this.resendTimer?.Dispose();
@@ -259,6 +261,17 @@ namespace MailQueueNet.Grpc
             return Task.CompletedTask;
         }
 
+        internal Task ProcessUndeliveredForTestsAsync()
+        {
+            return this.ProcessUndeliveredAsync();
+        }
+
+        internal void PauseResendTimerForTests()
+        {
+            this.resendTimer?.Dispose();
+            this.resendTimer = null;
+        }
+
         /// <inheritdoc />
         public async ValueTask DisposeAsync()
         {
@@ -279,9 +292,9 @@ namespace MailQueueNet.Grpc
                 return;
             }
 
-            var fileName = Path.Combine(this.undeliveredFolder, $"{DateTimeOffset.UtcNow:yyyyMMddHHmmss}_{Guid.NewGuid()}.mail");
-
-            FileUtils.WriteMailToFile(MailMessage.FromMessage(message), fileName);
+            var fileName = RetryMailFileStore.WriteMailToUndeliveredFolder(
+                MailMessage.FromMessage(message),
+                this.undeliveredFolder);
 
             Console.WriteLine($"Saved undelivered email to {fileName}");
         }
@@ -377,9 +390,15 @@ namespace MailQueueNet.Grpc
             try
             {
                 // ---- cluster lock (lock-file) ----
-                if (!this.fileLock!.TryAcquire())
+                var lockResult = this.fileLock!.TryAcquire();
+                if (!lockResult.Acquired)
                 {
-                    this.log.LogDebug("Another node owns resend lock");
+                    this.log.LogDebug(
+                        "Resend lock not acquired for {LockPath}. State={State}; Owner={Owner}; ExpiresUtc={ExpiresUtc}",
+                        lockResult.LockPath,
+                        lockResult.State,
+                        lockResult.Metadata?.Owner ?? string.Empty,
+                        lockResult.Metadata?.ExpiresUtc);
                     return;
                 }
 
@@ -402,7 +421,7 @@ namespace MailQueueNet.Grpc
                     return;
                 }
 
-                string[] files = Directory.GetFiles(this.config.UndeliveredFolder, "*.mail")
+                string[] files = Directory.GetFiles(this.config.UndeliveredFolder, RetryMailFileStore.FinalMailSearchPattern)
                                             .OrderBy(f => f)
                                             .ToArray();
                 DateTimeOffset cutoff = DateTimeOffset.UtcNow.AddHours(-this.config.ResendWindowHours);
@@ -464,9 +483,17 @@ namespace MailQueueNet.Grpc
 
         private bool StillOwnLock()
         {
-            bool inTime = (DateTime.UtcNow - this.lockAcquiredUtc)
-                          .TotalSeconds < this.config?.DistributedLockTimeoutSeconds;
-            return inTime && this.fileLock!.StillHeld();
+            return this.fileLock!.StillHeld();
+        }
+
+        private static string CreateResendLockOwnerId()
+        {
+            if (!string.IsNullOrWhiteSpace(MailGrpcService.MailGrpcServiceClient.ConfiguredClientId))
+            {
+                return MailGrpcService.MailGrpcServiceClient.ConfiguredClientId!;
+            }
+
+            return $"{Environment.MachineName}:{Environment.ProcessId}";
         }
 
         private async Task SendAlertAsync(int failedCount)

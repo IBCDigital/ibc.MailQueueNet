@@ -125,6 +125,14 @@
       <CopyToPublishDirectory>Never</CopyToPublishDirectory>
     </None>
   </ItemGroup>
+  <ItemGroup>
+    <Content Remove="..\dev-resources\remote access\**" />
+    <None Remove="..\dev-resources\remote access\**" />
+    <None Include="..\dev-resources\remote access\**" Visible="false">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+      <CopyToPublishDirectory>Never</CopyToPublishDirectory>
+    </None>
+  </ItemGroup>
 
   <ItemGroup>
     <AdditionalFiles Include="stylecop.json" />

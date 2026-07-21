@@ -128,7 +128,8 @@ namespace MailForge.Jobs
             var execution = new JobExecution(request.JobId, dbPath, resolvedJobWorkRoot);
             this.runningJobs[request.JobId] = execution;
 
-            execution.Task = Task.Run(async () =>
+            execution.Task = Task.Run(
+            async () =>
             {
                 try
                 {
@@ -149,7 +150,8 @@ namespace MailForge.Jobs
                 {
                     this.runningJobs.TryRemove(request.JobId, out _);
                 }
-            }, CancellationToken.None);
+            },
+            CancellationToken.None);
 
             return new StartMergeJobReply
             {
@@ -428,7 +430,7 @@ namespace MailForge.Jobs
                 return;
             }
 
-            var templateFrom = templateTransport.Message.From.ToSystemType();
+            var templateMessage = templateTransport.Message;
 
             var batchesFolder = this.ResolveBatchesFolder();
             Directory.CreateDirectory(batchesFolder);
@@ -551,13 +553,27 @@ namespace MailForge.Jobs
                             continue;
                         }
 
-                        var msg = new System.Net.Mail.MailMessage
+                        System.Net.Mail.MailMessage? msg = null;
+                        try
                         {
-                            From = templateFrom,
-                            Subject = renderResult.Subject ?? string.Empty,
-                            Body = renderResult.Body ?? string.Empty,
-                            IsBodyHtml = templateIsBodyHtml,
-                        };
+                            msg = new System.Net.Mail.MailMessage
+                            {
+                                From = await RenderTemplateMailAddressAsync(templateMessage.From, renderer, row, CancellationToken.None).ConfigureAwait(false),
+                                Subject = renderResult.Subject ?? string.Empty,
+                                Body = renderResult.Body ?? string.Empty,
+                                IsBodyHtml = templateIsBodyHtml,
+                            };
+
+                            await this.ApplyRenderedAddressHeadersAsync(msg, templateMessage, renderer, row, CancellationToken.None).ConfigureAwait(false);
+                        }
+                        catch (Exception ex) when (ex is TemplateRenderException || ex is FormatException || ex is ArgumentException)
+                        {
+                            msg?.Dispose();
+                            failed++;
+                            execution.BatchFailedById[batchId] = execution.BatchFailedById.TryGetValue(batchId, out var f) ? f + 1 : 1;
+                            execution.LastError = "Rendered address header is invalid: " + ex.Message;
+                            continue;
+                        }
 
                         msg.To.Add(new System.Net.Mail.MailAddress(recipient));
 
@@ -790,6 +806,88 @@ namespace MailForge.Jobs
                 {
                 }
             }
+        }
+
+        /// <summary>
+        /// Renders template address headers from the source message onto a generated recipient message.
+        /// </summary>
+        /// <param name="message">The generated message that will receive rendered address headers.</param>
+        /// <param name="templateMessage">The stored merge template message containing address templates.</param>
+        /// <param name="renderer">The template renderer selected for the merge job.</param>
+        /// <param name="jsonData">The JSON row used as the render model.</param>
+        /// <param name="cancellationToken">A token used to cancel rendering.</param>
+        /// <returns>A task that completes when address headers have been applied.</returns>
+        private async Task ApplyRenderedAddressHeadersAsync(
+            System.Net.Mail.MailMessage message,
+            MailQueueNet.Grpc.MailMessage templateMessage,
+            IMailTemplateRenderer renderer,
+            string jsonData,
+            CancellationToken cancellationToken)
+        {
+            if (templateMessage.Sender != null)
+            {
+                message.Sender = await RenderTemplateMailAddressAsync(templateMessage.Sender, renderer, jsonData, cancellationToken).ConfigureAwait(false);
+            }
+
+            foreach (var replyTo in templateMessage.ReplyTo)
+            {
+                var rendered = await RenderTemplateMailAddressAsync(replyTo, renderer, jsonData, cancellationToken).ConfigureAwait(false);
+                AddMailAddressIfMissing(message.ReplyToList, rendered);
+            }
+
+            foreach (var cc in templateMessage.Cc)
+            {
+                var rendered = await RenderTemplateMailAddressAsync(cc, renderer, jsonData, cancellationToken).ConfigureAwait(false);
+                AddMailAddressIfMissing(message.CC, rendered);
+            }
+
+            foreach (var bcc in templateMessage.Bcc)
+            {
+                var rendered = await RenderTemplateMailAddressAsync(bcc, renderer, jsonData, cancellationToken).ConfigureAwait(false);
+                AddMailAddressIfMissing(message.Bcc, rendered);
+            }
+        }
+
+        /// <summary>
+        /// Renders a protobuf mail address using the row model and converts it to a framework mail address.
+        /// </summary>
+        /// <param name="address">The protobuf address template to render.</param>
+        /// <param name="renderer">The template renderer selected for the merge job.</param>
+        /// <param name="jsonData">The JSON row used as the render model.</param>
+        /// <param name="cancellationToken">A token used to cancel rendering.</param>
+        /// <returns>The rendered mail address.</returns>
+        private static async Task<System.Net.Mail.MailAddress> RenderTemplateMailAddressAsync(
+            MailQueueNet.Grpc.MailAddress address,
+            IMailTemplateRenderer renderer,
+            string jsonData,
+            CancellationToken cancellationToken)
+        {
+            var result = await renderer.RenderAsync(address.Address ?? string.Empty, address.DisplayName ?? string.Empty, jsonData, cancellationToken).ConfigureAwait(false);
+            var renderedAddress = result.Subject?.Trim() ?? string.Empty;
+            var renderedDisplayName = result.Body?.Trim() ?? string.Empty;
+
+            if (string.IsNullOrWhiteSpace(renderedDisplayName))
+            {
+                return new System.Net.Mail.MailAddress(renderedAddress);
+            }
+
+            return new System.Net.Mail.MailAddress(renderedAddress, renderedDisplayName);
+        }
+
+        /// <summary>
+        /// Adds a rendered address to a collection when the same address is not already present.
+        /// </summary>
+        /// <param name="collection">The destination mail address collection.</param>
+        /// <param name="address">The rendered mail address to add.</param>
+        private static void AddMailAddressIfMissing(System.Net.Mail.MailAddressCollection collection, System.Net.Mail.MailAddress address)
+        {
+            if (collection.Any(existing => string.Equals(existing.Address, address.Address, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(existing.DisplayName ?? string.Empty, address.DisplayName ?? string.Empty, StringComparison.Ordinal)))
+            {
+                return;
+            }
+
+            collection.Add(address);
         }
 
         private void TryStampMergeHeaders(System.Net.Mail.MailMessage message, string mergeId, string batchId)
